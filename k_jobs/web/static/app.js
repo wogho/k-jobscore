@@ -241,12 +241,12 @@ window.addEventListener("resize", fit);
 
 /* ── 설정 ── */
 let D = null;   // 고치는 중인 설정(저장 전)
-const TABS = [["words", "단어"], ["score", "점수"], ["cond", "조건"], ["collect", "수집"], ["ai", "AI 판단"]];
-let tab = "words", META = null;
+const TABS = [["score", "점수·단어"], ["cond", "조건"], ["collect", "수집"], ["ai", "AI 판단"]];
+let tab = "score", META = null, sel = -1;   // sel: 세부 설정을 펼친 단어(칩을 누르면 펼침)
 
 async function openSettings() {
   try { META = await api("/api/config"); } catch (e) { alert(`설정을 불러오지 못했습니다. ${e.message}`); return; }
-  D = JSON.parse(JSON.stringify(META.cfg));
+  D = JSON.parse(JSON.stringify(META.cfg)); sel = -1;
   renderModal("");
 }
 const close = () => { $("#kj-modal-root").innerHTML = ""; D = null; };
@@ -262,31 +262,51 @@ function choice(path, label, hint, opts) {
   return `<label>${esc(label)}${hint ? `<small>${esc(hint)}</small>` : ""}<select data-path="${path}">${opts.map(([k, l]) => `<option value="${esc(k)}" ${k === v ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></label>`;
 }
 const HANDLE = [["keep", "통과"], ["hold", "보류(남기고 표시)"], ["drop", "제외"]];
+const GROUPS = [["plus", "가점 단어", ""], ["minus", "감점 단어", ""], ["veto", "즉시 제외 단어", "있으면 0점"], ["must", "필수 단어", "제목·상세 어디에도 없으면 0점"]];
+const wtext = (w) => (Array.isArray(w.word) ? w.word.join("·") : w.word);
+const custom = (w) => w.title !== undefined || w.body !== undefined || (w.where && w.where !== "both") || (w.match && w.match !== "auto");
+
+/* 단어 묶음 — 평소에는 칩만, 칩을 누르면 그 단어의 세부 설정이 아래에 펼쳐진다 */
+function wordGroup(kind, label, note) {
+  const items = D.score.words.map((w, i) => [w, i]).filter(([w]) => w.kind === kind);
+  const open = items.find(([, i]) => i === sel);
+  const opt = (k, v, list) => list.map(([x, l]) => `<option value="${x}" ${(v || list[0][0]) === x ? "selected" : ""}>${l}</option>`).join("");
+  let panel = "";
+  if (open) {
+    const [w, i] = open, fixed = w.kind === "veto" || w.kind === "must";
+    panel = `<div class="kj-wedit" data-i="${i}">
+      <label class="kj-wide">단어<small>쉼표로 같은 뜻 묶기</small><input data-w="word" value="${esc(Array.isArray(w.word) ? w.word.join(", ") : w.word)}"></label>
+      <label>종류<select data-w="kind">${opt("kind", w.kind, [["plus", "가점"], ["minus", "감점"], ["veto", "즉시 제외"], ["must", "필수"]])}</select></label>
+      <label>보는 곳<select data-w="where">${opt("where", w.where, [["both", "제목·상세 둘 다"], ["title", "제목만"], ["body", "상세만"]])}</select></label>
+      ${fixed ? "" : `<label>제목 점수<small>비우면 기본</small><input type="number" data-w="title" value="${w.title ?? ""}" placeholder="기본"></label>
+      <label>상세 점수<small>비우면 기본</small><input type="number" data-w="body" value="${w.body ?? ""}" placeholder="기본"></label>`}
+      <label>찾는 방식<select data-w="match">${opt("match", w.match, [["auto", "자동"], ["contains", "포함"], ["word", "낱말 단위"], ["regex", "정규식"]])}</select></label>
+      <button type="button" class="kj-link" data-act="unsel">접기</button></div>`;
+  }
+  return `<div class="kj-words"><p class="kj-words__label">${label} <span>${items.length}개${note ? ` · ${note}` : ""}</span></p>
+    ${items.length ? `<div class="kj-words__list">${items.map(([w, i]) => `<span class="kj-kw kj-kw--${kind} ${i === sel ? "is-sel" : ""}">
+      <button type="button" class="kj-kw__name" data-act="pick" data-i="${i}" title="세부 설정">${esc(wtext(w))}${custom(w) ? " ⚙" : ""}</button>
+      <button type="button" data-act="del" data-i="${i}" aria-label="${esc(wtext(w))} 빼기">×</button></span>`).join("")}</div>` : ""}
+    ${panel}
+    <div class="kj-words__add"><input id="kj-new-${kind}" data-kind="${kind}" placeholder="단어 입력 후 Enter" aria-label="${label} 추가">
+      <button type="button" class="kj-btn kj-btn--secondary" data-act="add" data-kind="${kind}">추가</button></div></div>`;
+}
 
 function tabBody() {
-  if (tab === "words") {
-    const kinds = [["plus", "가점"], ["minus", "감점"], ["veto", "즉시 제외"], ["must", "필수"]];
-    return `<p class="kj-hint">같은 뜻의 단어는 쉼표로 묶으면 한 번만 셉니다(예: k8s, kubernetes, 쿠버네티스). 점수를 비우면 [점수] 탭의 기본값을 씁니다.
-      영문 4자 이하(OP, IDC 등)는 낱말 단위로만 찾습니다.</p>
-      <table class="kj-wtable"><thead><tr><th>단어(동의어는 쉼표)</th><th>종류</th><th>제목</th><th>상세</th><th class="kj-hide-sm">보는 곳</th><th class="kj-hide-sm">찾는 방식</th><th></th></tr></thead><tbody>
-      ${D.score.words.map((w, i) => `<tr data-i="${i}">
-        <td><input data-w="word" value="${esc(Array.isArray(w.word) ? w.word.join(", ") : w.word)}"></td>
-        <td><select data-w="kind">${kinds.map(([k, l]) => `<option value="${k}" ${w.kind === k ? "selected" : ""}>${l}</option>`).join("")}</select></td>
-        <td><input type="number" data-w="title" value="${w.title ?? ""}" placeholder="기본" ${w.kind === "veto" || w.kind === "must" ? "disabled" : ""}></td>
-        <td><input type="number" data-w="body" value="${w.body ?? ""}" placeholder="기본" ${w.kind === "veto" || w.kind === "must" ? "disabled" : ""}></td>
-        <td class="kj-hide-sm"><select data-w="where">${[["both", "둘 다"], ["title", "제목"], ["body", "상세"]].map(([k, l]) => `<option value="${k}" ${(w.where || "both") === k ? "selected" : ""}>${l}</option>`).join("")}</select></td>
-        <td class="kj-hide-sm"><select data-w="match">${[["auto", "자동"], ["contains", "포함"], ["word", "낱말"], ["regex", "정규식"]].map(([k, l]) => `<option value="${k}" ${(w.match || "auto") === k ? "selected" : ""}>${l}</option>`).join("")}</select></td>
-        <td><button type="button" class="kj-x" data-act="del" aria-label="빼기">×</button></td></tr>`).join("")}
-      </tbody></table>
-      <div class="kj-words__add"><input id="kj-new-word" placeholder="새 단어 입력 후 Enter" aria-label="새 단어"><select id="kj-new-kind" class="kj-select">${kinds.map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select>
-        <button type="button" class="kj-btn kj-btn--secondary" data-act="add">추가</button></div>`;
+  if (tab === "score") {
+    const num = (path, label, hint, extra = "") => `<label class="kj-num"><span>${esc(label)}<small>${esc(hint)}</small></span>
+      <input type="number" data-path="${path}" value="${esc(path.split(".").reduce((o, k) => o[k], D))}" ${extra}></label>`;
+    return `<div class="kj-nums">
+        ${num("score.base", "시작 점수", "모든 공고", 'min="0" max="100"')}${num("score.defaults.plus_title", "제목 가점", "단어 하나당", 'min="0" max="100"')}
+        ${num("score.defaults.minus_title", "제목 감점", "단어 하나당", 'min="-100" max="0"')}${num("score.defaults.plus_body", "상세 가점", "단어 하나당", 'min="0" max="50"')}
+        ${num("score.defaults.minus_body", "상세 감점", "단어 하나당", 'min="-50" max="0"')}${num("score.body_cap", "상세 점수 한도", "상세 합계 ±", 'min="0" max="100"')}</div>
+      ${GROUPS.map(([kind, label, note]) => wordGroup(kind, label, note)).join("")}
+      <p class="kj-hint">단어를 누르면 그 단어만의 점수·보는 곳·찾는 방식을 정할 수 있습니다. 쉼표로 여러 단어를 한 번에 넣으면 같은 뜻으로 묶여 한 번만 셉니다.
+        영문 4자 이하(OP, IDC, k8s 등)는 낱말 단위로만 찾습니다.</p>
+      <details class="kj-more"><summary>점수 색 기준·상세 생략</summary><div class="kj-form">
+        ${field("score.tiers.high", "높음 기준", "파란 원")}${field("score.tiers.mid", "보통 기준", "검은 원")}${field("score.tiers.low", "낮음 기준", "주황 원, 그 아래는 빨강")}
+        ${field("score.title_minus_skips_detail", "제목에 감점 단어가 있으면 상세를 보지 않기", "끄면 모든 공고의 상세를 읽습니다(느려짐)", "checkbox")}</div></details>`;
   }
-  if (tab === "score") return `<div class="kj-form">
-      ${field("score.base", "시작 점수", "모든 공고", "number", 'min="0" max="100"')}${field("score.body_cap", "상세 점수 한도", "상세 합계 ±", "number", 'min="0" max="100"')}
-      ${field("score.defaults.plus_title", "제목 가점(기본)", "단어 하나당")}${field("score.defaults.minus_title", "제목 감점(기본)", "단어 하나당")}
-      ${field("score.defaults.plus_body", "상세 가점(기본)", "단어 하나당")}${field("score.defaults.minus_body", "상세 감점(기본)", "단어 하나당")}
-      ${field("score.tiers.high", "높음 기준", "파란 원")}${field("score.tiers.mid", "보통 기준", "검은 원")}${field("score.tiers.low", "낮음 기준", "주황 원, 그 아래는 빨강")}
-      ${field("score.title_minus_skips_detail", "제목에 감점 단어가 있으면 상세를 보지 않기", "끄면 모든 공고의 상세를 읽습니다(느려짐)", "checkbox")}</div>`;
   if (tab === "cond") return `<div class="kj-form">
       ${choice("conditions.education.my_level", "내 학력", "이보다 높은 학력을 요구하면 불일치", META.levels.map((l) => [l, l === "무관" ? "학력 없음/무관" : l]))}
       ${choice("conditions.education.unlabeled", "학력 표기가 없을 때", "", HANDLE)}
@@ -341,12 +361,12 @@ function renderModal(msg) {
 }
 
 function setPath(path, v) { const ks = path.split("."); let o = D; ks.slice(0, -1).forEach((k) => { o = o[k]; }); o[ks.at(-1)] = v; }
-function addWord() {
-  const inp = $("#kj-new-word"), v = inp.value.trim(); if (!v) return;
+function addWord(kind) {
+  const inp = $(`#kj-new-${kind}`), v = inp.value.trim(); if (!v) return;
   const parts = v.split(",").map((x) => x.trim()).filter(Boolean);
-  D.score.words.push({ word: parts.length > 1 ? parts : parts[0], kind: $("#kj-new-kind").value });
+  D.score.words.push({ word: parts.length > 1 ? parts : parts[0], kind });
   renderModal("");
-  $("#kj-new-word").focus();
+  $(`#kj-new-${kind}`).focus();
 }
 
 document.addEventListener("change", (e) => {
@@ -357,16 +377,17 @@ document.addEventListener("change", (e) => {
       : t.type === "number" ? Number(t.value) : t.value;
     setPath(t.dataset.path, v);
   } else if (t.dataset.w) {
-    const w = D.score.words[Number(t.closest("tr").dataset.i)], k = t.dataset.w;
+    const w = D.score.words[Number(t.closest("[data-i]").dataset.i)], k = t.dataset.w;
     if (k === "word") { const parts = t.value.split(",").map((x) => x.trim()).filter(Boolean); w.word = parts.length > 1 ? parts : parts[0] || ""; }
     else if (k === "title" || k === "body") { if (t.value === "") delete w[k]; else w[k] = Number(t.value); }
-    else { w[k] = t.value; if (k === "kind") renderModal(""); }
+    else w[k] = t.value;
+    renderModal("");
   }
 });
 document.addEventListener("keydown", (e) => {
   if (!D) return;
   if (e.key === "Escape") close();
-  if (e.key === "Enter" && e.target.id === "kj-new-word") { e.preventDefault(); addWord(); }
+  if (e.key === "Enter" && e.target.dataset.kind) { e.preventDefault(); addWord(e.target.dataset.kind); }
 });
 document.addEventListener("click", async (e) => {
   if (e.target.id === "kj-open-set") return openSettings();
@@ -375,8 +396,11 @@ document.addEventListener("click", async (e) => {
   const tb = e.target.closest("[data-tab]"); if (tb) { tab = tb.dataset.tab; renderModal(""); return; }
   const a = e.target.closest("[data-act]")?.dataset.act;
   if (a === "close") close();
-  if (a === "add") addWord();
-  if (a === "del") { D.score.words.splice(Number(e.target.closest("tr").dataset.i), 1); renderModal(""); }
+  const el = e.target.closest("[data-act]");
+  if (a === "add") addWord(el.dataset.kind);
+  if (a === "pick") { const i = Number(el.dataset.i); sel = sel === i ? -1 : i; renderModal(""); }
+  if (a === "unsel") { sel = -1; renderModal(""); }
+  if (a === "del") { const i = Number(el.dataset.i); D.score.words.splice(i, 1); sel = -1; renderModal(""); }
   if (a === "save" || a === "reset") {
     if (a === "reset" && !confirm("선택한 프리셋 기본값으로 되돌릴까요? 지금 설정은 사라집니다.")) return;
     try {

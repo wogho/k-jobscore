@@ -169,7 +169,29 @@ class Filters(unittest.TestCase):
         self.assertEqual(filters.judge("ok", "ok", "전공 필수", c), "drop")
 
 
+class Categories(unittest.TestCase):
+    def test_infra_preset_roles(self):
+        c = lambda t, co: filters.categorize(t, co, CFG["roles"])  # noqa: E731
+        self.assertEqual(c("시스템 엔지니어 신입", "(주)에이"), ["infra"])
+        self.assertEqual(c("DevOps Engineer", "토스"), ["devops"])
+        self.assertEqual(c("보안관제/침해대응 담당자", "(주)씨"), ["security"])
+        self.assertEqual(c("건물 보안요원 모집", "(주)경비"), [])
+        self.assertIn("digital", c("2027 IT 신입행원", "KB국민은행"))
+        self.assertIn("digital", c("IT 신입사원", "삼성전자(주)"))
+        self.assertEqual(c("IT 개발", "현대건축(주)"), [])
+        self.assertEqual(c("디지털 마케팅", "(주)광고"), [])
+        self.assertIn("jeonsan", c("전산직 채용", "한국전력공사"))
+        self.assertEqual(c("AI/풀스택/기타IT개발", "한국ICT인재개발원"), [])
+
+
 class Normalize(unittest.TestCase):
+    def test_deadline_formats(self):
+        from datetime import datetime
+        now = datetime(2026, 11, 26)
+        self.assertEqual(deadline_norm("~ 12/07(월)", now), "2026-12-07")
+        self.assertEqual(deadline_norm("~ 01/05(월)", now), "2027-01-05")
+        self.assertEqual(deadline_norm("내일마감", now), "2026-11-27")
+
     def test_misc(self):
         self.assertEqual(career_range(2, 100), "경력 2년 이상")
         self.assertEqual(career_range(0, 2), "신입~2년")
@@ -194,6 +216,15 @@ class ViewExport(unittest.TestCase):
             self.assertNotIn("d_body", by["1"])   # 본문은 화면으로 나가지 않는다
             line = export.to_career_ops(export.pick(out["items"], 60))
             self.assertTrue(line.startswith("- [ ] https://example.com/1 | A/B | 클라우드 인프라 엔지니어 | 서울 | note: k-jobs 70점"))
+
+
+class OldDatabase(unittest.TestCase):
+    def test_items_without_details_and_ai_tables(self):
+        c = sqlite3.connect(":memory:")
+        c.execute(store.SCHEMA[0])
+        c.execute("insert into postings values('saramin','1','u','시스템 엔지니어','A','서울','신입',0,'고졸','','2099-12-31','2099-01-01','2099-01-01','infra')")
+        r = view.items(c, CFG)
+        self.assertEqual((r["items"][0]["stage"], r["runs"]), ("pending", []))
 
 
 class AI(unittest.TestCase):
