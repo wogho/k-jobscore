@@ -333,8 +333,9 @@ function tabBody() {
       <p class="kj-hint kj-wide">직무 분류(roles)와 프록시는 config.json에서 고칩니다. 직무를 바꾼 뒤에는 <code>k-jobs reclassify</code>를 실행하세요.</p></div>`;
   return `<div class="kj-form">
       ${field("ai.enabled", "AI 판단 켜기", "기본은 꺼짐. 단어 규칙을 통과한 공고만 보냅니다", "checkbox")}
-      ${choice("ai.provider", "AI 종류", "", [["openai", "OpenAI 호환(OpenAI·Ollama·OpenRouter 등)"], ["anthropic", "Anthropic"]])}
-      ${field("ai.base_url", "주소", "Ollama 예: http://localhost:11434/v1", "text")}
+      ${choice("ai.provider", "AI 종류", "", [["cli", "설치된 AI 명령어(키 없음)"], ["openai", "OpenAI 호환(OpenAI·Ollama·OpenRouter 등)"], ["anthropic", "Anthropic"]])}
+      ${choice("ai.cli", "AI 명령어", "AI 종류가 '설치된 AI 명령어'일 때", [["auto", "자동(찾은 것)"], ["claude", "claude"], ["codex", "codex"], ["gemini", "gemini"]])}
+      ${field("ai.base_url", "주소", "API 방식일 때. Ollama 예: http://localhost:11434/v1", "text")}
       ${field("ai.model", "모델 이름", "", "text")}
       ${field("ai.api_key_env", "API 키 환경변수 이름", "키 자체는 여기에 넣지 않습니다", "text")}
       ${field("ai.weight", "AI 점수 비중", "0~1, 최종 = 규칙×(1-비중) + AI×비중", "number", 'min="0" max="1" step="0.05"')}
@@ -342,7 +343,8 @@ function tabBody() {
       ${field("ai.max_per_run", "한 번에 보낼 최대 건수", "", "number", 'min="0" max="500"')}
       ${field("ai.profile_file", "내 이력 요약 파일 경로", "연락처 등 개인정보는 빼 두세요", "text")}
       <label class="kj-wide">추가 판단 기준<small>예: 재택 가능하면 좋음, 스타트업보다 공공기관 선호</small><textarea data-path="ai.rubric">${esc(D.ai.rubric)}</textarea></label>
-      <p class="kj-hint kj-wide">AI는 공고 원문을 인용해야 하고, 인용이 원문에 없으면 그 판단은 버립니다. 즉시 제외·학력/경력 불일치는 AI가 뒤집지 못합니다.</p></div>`;
+      <p class="kj-hint kj-wide">설정 없이 쓰려면: 이 저장소를 AI 에이전트(Claude Code·Codex·Gemini CLI 등)로 열고 "공고 판정해 줘"라고 하면 그 AI가 직접 판정합니다(AGENTS.md).
+        AI는 공고 원문을 인용해야 하고, 인용이 원문에 없으면 그 판단은 버립니다. 즉시 제외·학력/경력 불일치는 AI가 뒤집지 못합니다.</p></div>`;
 }
 
 function renderModal(msg) {

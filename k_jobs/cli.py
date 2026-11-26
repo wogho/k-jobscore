@@ -4,6 +4,8 @@
   k-jobs collect [--only 사이트] [--no-detail]          목록 수집 + 상세 확인(+ AI 판단, 켰다면)
   k-jobs enrich [--budget 초]                          밀린 상세 확인만
   k-jobs ai [--limit N]                                AI 판단만(설정에서 켰을 때)
+  k-jobs ai --export 파일 [--limit N]                  에이전트 모드: 판정할 공고 내보내기(설정 없음, AGENTS.md)
+  k-jobs ai --import 파일                              에이전트 모드: 에이전트가 쓴 판정 넣기(인용 검사)
   k-jobs list [--min 점수] [--limit N]                  점수 순 목록
   k-jobs export --format csv|json|career-ops [-o 파일]  내보내기
   k-jobs serve [--port 8765]                           웹 화면(내 컴퓨터에서만)
@@ -44,8 +46,21 @@ def cmd_init(a):
     cfg_path, _, _ = paths()
     if cfg_path.exists() and not a.force:
         sys.exit(f"이미 있습니다: {cfg_path} (덮어쓰려면 --force)")
-    config.save(cfg_path, config.load(preset=a.preset))
+    cfg = config.load(preset=a.preset)
+    found = ai.detect_cli()
+    use = a.ai
+    if use == "ask":
+        use = "none"
+        if found and sys.stdin.isatty():
+            ans = input(f"설치된 AI 명령어 {found[0]}을(를) 찾았습니다. 공고 판정에 쓸까요? 구독 사용량을 씁니다 [y/N] ").strip().lower()
+            use = found[0] if ans in ("y", "yes", "ㅇ", "네") else "none"
+    if use != "none":
+        if use == "auto" and not found:
+            sys.exit("설치된 AI 명령어(claude·codex·gemini)를 찾지 못했습니다. --ai none으로 만든 뒤 나중에 켜세요.")
+        cfg["ai"].update(enabled=True, provider="cli", cli=use)
+    config.save(cfg_path, cfg)
     print(f"설정을 만들었습니다: {cfg_path} (프리셋: {a.preset} — {PRESETS[a.preset]['label']})")
+    print(f"AI 판단: {'켜짐 — 설치된 ' + use + ' 명령어 사용' if use != 'none' else '꺼짐(에이전트 모드는 설정 없이 쓸 수 있습니다: AGENTS.md)'}")
     print("다음: 설정을 고친 뒤 `k-jobs collect`, 화면은 `k-jobs serve`.")
 
 
@@ -67,9 +82,19 @@ def cmd_enrich(a):
 
 def cmd_ai(a):
     cfg = _cfg()
+    c = store.connect(paths()[1])
+    if a.export:
+        data = ai.export(c, cfg, limit=a.limit or 10)
+        Path(a.export).write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+        print(f"판정할 공고 {len(data['items'])}건 → {a.export}")
+        print("다음: 각 공고를 판정해 결과 파일을 만든 뒤 `k-jobs ai --import 결과.json` (형식은 파일의 how 항목, AGENTS.md)")
+        return
+    if a.import_file:
+        ai.import_results(c, cfg, json.loads(Path(a.import_file).read_text(encoding="utf-8")))
+        return
     if not cfg["ai"]["enabled"]:
-        sys.exit("AI 판단이 꺼져 있습니다(config.json의 ai.enabled).")
-    ai.run(store.connect(paths()[1]), cfg, limit=a.limit)
+        sys.exit("AI 판단이 꺼져 있습니다(config.json의 ai.enabled). 설정 없이 쓰려면 에이전트 모드: k-jobs ai --export")
+    ai.run(c, cfg, limit=a.limit)
 
 
 def _items(cfg, min_score=0, include_hold=True):
@@ -106,8 +131,8 @@ def cmd_serve(a):
 
 def cmd_suggest(a):
     cfg = _cfg()
-    if not cfg["ai"]["model"]:
-        sys.exit("ai.model과 API 키 환경변수를 먼저 설정하세요(ai.enabled는 꺼 둬도 됩니다).")
+    if cfg["ai"]["provider"] != "cli" and not cfg["ai"]["model"]:
+        sys.exit("ai.provider를 cli로 하거나(설치된 AI 명령어), ai.model과 API 키 환경변수를 설정하세요(ai.enabled는 꺼 둬도 됩니다).")
     print(json.dumps(ai.suggest(cfg, Path(a.resume).read_text(encoding="utf-8")), ensure_ascii=False, indent=1))
     print("\n위 초안을 검토해 config.json의 queries·score.words·conditions에 옮기세요.", file=sys.stderr)
 
@@ -141,9 +166,17 @@ def cmd_doctor(a):
         line(True, "Pillow")
     except ImportError:
         line(False, "Pillow 없음 — pip install 'k-jobs[ocr]'")
+    found = ai.detect_cli()
+    print(("· " if found else "· ") + f"설치된 AI 명령어: {', '.join(found) if found else '없음'}(provider cli로 키 없이 쓸 수 있음)")
     if cfg and cfg["ai"]["enabled"]:
-        line(bool(os.environ.get(cfg["ai"]["api_key_env"])) or "localhost" in cfg["ai"]["base_url"],
-             f"AI 키 환경변수 {cfg['ai']['api_key_env']}")
+        if cfg["ai"]["provider"] == "cli":
+            try:
+                line(True, "AI 판단: " + " ".join(ai.cli_command(cfg)[:2]))
+            except RuntimeError as e:
+                line(False, f"AI 판단: {e}")
+        else:
+            line(bool(os.environ.get(cfg["ai"]["api_key_env"])) or "localhost" in cfg["ai"]["base_url"],
+                 f"AI 키 환경변수 {cfg['ai']['api_key_env']}")
     if cfg and a.network:
         from .http import Net
         net = Net(cfg)
@@ -167,6 +200,8 @@ def main(argv=None):
     p = sub.add_parser("init")
     p.add_argument("--preset", choices=list(PRESETS), default="infra-junior")
     p.add_argument("--force", action="store_true")
+    p.add_argument("--ai", default="ask", choices=["ask", "auto", "none", "claude", "codex", "gemini"],
+                   help="설치된 AI 명령어로 판정할지(ask: 찾으면 물어봄)")
     p.set_defaults(fn=cmd_init)
     p = sub.add_parser("collect")
     p.add_argument("--only", choices=config.SITES)
@@ -178,6 +213,8 @@ def main(argv=None):
     p.set_defaults(fn=cmd_enrich)
     p = sub.add_parser("ai")
     p.add_argument("--limit", type=int)
+    p.add_argument("--export", metavar="파일", help="에이전트 모드: 판정할 공고 내보내기")
+    p.add_argument("--import", dest="import_file", metavar="파일", help="에이전트 모드: 판정 결과 넣기")
     p.set_defaults(fn=cmd_ai)
     p = sub.add_parser("list")
     p.add_argument("--min", type=int, default=50)

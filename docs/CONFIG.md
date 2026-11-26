@@ -38,7 +38,13 @@
 | `detail.img_min_w` · `img_min_h` | 300 · 200 | 이보다 작은 이미지(로고 등)는 건너뜀 |
 | `detail.budget_sec` | 1500 | 한 번에 상세 확인할 최대 시간 |
 | `detail.retry_failed_after_h` | 6 | 실패한 상세를 다시 시도할 간격 |
-| `ai.*` | 꺼짐 | README의 AI 판단 참고 |
+| `ai.enabled` | false | AI 판단 켜기(에이전트 모드는 꺼져 있어도 씀) |
+| `ai.provider` | openai | `cli`(설치된 AI 명령어) / `openai`(OpenAI 호환) / `anthropic` |
+| `ai.cli` · `ai.cli_command` | auto · [] | provider cli: claude·codex·gemini 중 찾은 것, 또는 직접 지정한 명령 |
+| `ai.cli_timeout` | 300 | 명령어 한 번의 시간 제한(초) |
+| `ai.base_url` · `model` · `api_key_env` | — | API 방식일 때 |
+| `ai.weight` · `min_rule_score` · `max_per_run` | 0.3 · 50 · 20 | 점수 비중 · 보낼 최소 규칙 점수 · 한 번에 보낼 건수 |
+| `ai.profile_file` · `rubric` | — | 내 이력 요약 파일 · 추가 판단 기준 |
 
 ## score.words
 

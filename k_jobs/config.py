@@ -52,7 +52,10 @@ def _base(preset="infra-junior"):
                    "ocr_timeout": 240, "budget_sec": 1500, "retry_failed_after_h": 6},
         "ai": {
             "enabled": False,
-            "provider": "openai",          # openai(OpenAI 호환: OpenAI·Ollama·OpenRouter·Gemini 호환 주소) / anthropic
+            "provider": "openai",          # openai(OpenAI 호환: OpenAI·Ollama·OpenRouter·Gemini 호환 주소) / anthropic / cli(설치된 AI 명령어)
+            "cli": "auto",                 # provider cli: auto(찾은 것 중 첫째) / claude / codex / gemini
+            "cli_command": [],             # provider cli: 직접 지정한 명령(프롬프트는 마지막 인자로 붙음). 비우면 cli 값으로
+            "cli_timeout": 300,
             "base_url": "https://api.openai.com/v1",
             "model": "",
             "api_key_env": "KJOBS_AI_KEY",  # 키는 설정 파일이 아니라 환경변수에서만 읽는다
@@ -73,7 +76,7 @@ LIMITS = {("score", "base"): (0, 100), ("score", "body_cap"): (0, 100),
           ("score", "defaults", "minus_title"): (-100, 0), ("score", "defaults", "minus_body"): (-50, 0),
           ("conditions", "career", "max_required_years"): (0, 30), ("conditions", "open_days"): (1, 365),
           ("pages",): (1, 20), ("network", "delay_sec"): (1, 60), ("detail", "images_max"): (0, 12),
-          ("ai", "weight"): (0, 1), ("ai", "min_rule_score"): (0, 100), ("ai", "max_per_run"): (0, 500)}
+          ("ai", "weight"): (0, 1), ("ai", "min_rule_score"): (0, 100), ("ai", "max_per_run"): (0, 500), ("ai", "cli_timeout"): (30, 1800)}
 
 
 def _merge(base, over):
@@ -183,8 +186,12 @@ def clean(cfg):
     if len(words) > 200:
         raise ValueError("단어는 200개까지입니다")
     cfg["score"]["words"] = words
-    if cfg["ai"]["provider"] not in ("openai", "anthropic"):
-        raise ValueError("ai.provider는 openai 또는 anthropic")
+    if cfg["ai"]["provider"] not in ("openai", "anthropic", "cli"):
+        raise ValueError("ai.provider는 openai · anthropic · cli 중 하나")
+    if cfg["ai"]["cli"] not in ("auto", "claude", "codex", "gemini"):
+        raise ValueError("ai.cli는 auto · claude · codex · gemini 중 하나")
+    if not isinstance(cfg["ai"]["cli_command"], list) or not all(isinstance(x, str) for x in cfg["ai"]["cli_command"]):
+        raise ValueError("ai.cli_command는 문자열 목록")
     return cfg
 
 
