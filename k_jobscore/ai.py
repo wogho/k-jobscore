@@ -269,13 +269,14 @@ def import_results(c, cfg, data, log=print):
     """에이전트가 쓴 판정 → 같은 인용 검사 후 저장. → (저장, 버림)."""
     model = "agent:" + str(data.get("model") or "unknown")[:40]
     texts = {(s, i): (b or "") + "\n" + (o or "") for s, i, b, o in c.execute("select source, sid, body, ocr from details where error = ''")}
+    profile = _profile(cfg)
     ok = bad = 0
     for r in data.get("results") or []:
         k = (str(r.get("source")), str(r.get("sid")))
         if k not in texts or not isinstance(r.get("result"), (dict, str)):
             bad += 1
             continue
-        item = {"source": k[0], "sid": k[1], "text": texts[k], "key": str(r.get("key") or cache_key("agent", cfg, _profile(cfg), texts[k]))}
+        item = {"source": k[0], "sid": k[1], "text": texts[k], "key": cache_key("agent", cfg, profile, texts[k])}   # 파일의 key는 믿지 않고 지금 기준으로
         try:
             _save(c, item, model, parse(r["result"], texts[k]))
             ok += 1
