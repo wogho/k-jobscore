@@ -280,6 +280,18 @@ class AI(unittest.TestCase):
         fit, model, err = c.execute("select fit, model, error from ai").fetchone()
         self.assertEqual((fit, model, err), (66, "cli:python3", ""))
 
+    def test_any_ai_counts_as_done_and_errors_retry(self):
+        c = self._db()
+        it = ai.export(c, CFG)["items"][0]
+        ai.import_results(c, CFG, {"model": "agent-x", "results": [{**it, "result": {"fit": 70, "matched": [{"point": "p", "quote": "학력 무관"}]}}]}, log=lambda *_: 0)
+        cfg = config.load()
+        cfg["ai"].update(enabled=True, provider="cli", cli_command=["python3", "-c", "print('RESULT_JSON: {}')"])
+        self.assertEqual(ai.run(c, cfg, log=lambda *_: 0), 0)          # 에이전트가 판정한 공고는 다른 AI가 다시 하지 않음
+        c.execute("delete from ai")
+        cfg["ai"]["cli_command"] = ["python3", "-c", "import sys; sys.exit(3)"]
+        self.assertEqual(ai.run(c, cfg, log=lambda *_: 0), 1)          # 실패 저장
+        self.assertEqual(ai.run(c, cfg, log=lambda *_: 0), 1)          # 실패한 공고는 다음에 다시 시도
+
     def test_run_skips_when_disabled(self):
         self.assertEqual(ai.run(sqlite3.connect(":memory:"), CFG), 0)
 

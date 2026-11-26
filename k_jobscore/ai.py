@@ -62,8 +62,10 @@ def build_messages(post, text, cfg, profile=""):
 
 
 def cache_key(model, cfg, profile, text):
+    """같은 공고 글 + 같은 판단 기준이면 같은 키 — 어느 AI(에이전트·명령어·API)가 판정했든 다시 보내지 않는다.
+    model은 예전 호출 형태를 위해 받기만 한다."""
     h = hashlib.sha256()
-    for part in (model, cfg["ai"].get("rubric", ""), profile, json.dumps(cfg["score"]["words"], ensure_ascii=False), text):
+    for part in (cfg["ai"].get("rubric", ""), profile, json.dumps(cfg["score"]["words"], ensure_ascii=False), text):
         h.update(part.encode("utf-8"))
         h.update(b"\0")
     return h.hexdigest()[:32]
@@ -193,7 +195,8 @@ def _profile(cfg, log=print):
 def candidates(c, cfg, model, profile):
     """AI에 보낼 공고: 상세 확인됨 · 규칙 점수 ≥ min_rule_score · 조건 불일치 아님 · 같은 설정으로 이미 판정하지 않음(최신 순)."""
     a = cfg["ai"]
-    rows = c.execute("select p.source, p.sid, p.url, p.title, p.company, p.career, p.edu, d.body, d.ocr, d.career_v, d.edu_v, d.note, a.key "
+    rows = c.execute("select p.source, p.sid, p.url, p.title, p.company, p.career, p.edu, d.body, d.ocr, d.career_v, d.edu_v, d.note, "
+                     "case when a.error = '' then a.key end "   # 실패한 판정은 키를 없는 것으로 — 다음 회차에 다시 시도
                      "from postings p join details d on d.source = p.source and d.sid = p.sid and d.error = '' "
                      "left join ai a on a.source = p.source and a.sid = p.sid order by p.first_seen desc").fetchall()
     for source, sid, url, title, company, career, edu, body, text_ocr, cv, ev, note, old_key in rows:
