@@ -1,10 +1,10 @@
-k-jobs
+k-jobscore
 Copyright (c) 2026 wogho — MIT License (see LICENSE)
 
 This project is based on career-ops
   https://github.com/career-ops-hq/career-ops
   MIT License, Copyright (c) 2026 Santiago Fernández de Valderrama
-  "career-ops" is a trademark of its maintainer. k-jobs is not affiliated with
+  "career-ops" is a trademark of its maintainer. k-jobscore is not affiliated with
   or endorsed by the career-ops project; the name is used only to describe origin
   and compatibility, as its TRADEMARK.md permits.
   Ideas adapted (re-implemented in Python, no code copied):

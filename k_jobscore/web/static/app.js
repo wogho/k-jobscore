@@ -1,4 +1,4 @@
-/* k-jobs 웹 화면 — 외부 라이브러리 없이. 점수·판정은 서버(/api/jobs)가 지금 설정으로 계산하고, 화면은 거르기·정렬·표시만 한다. */
+/* k-jobscore 웹 화면 — 외부 라이브러리 없이. 점수·판정은 서버(/api/jobs)가 지금 설정으로 계산하고, 화면은 거르기·정렬·표시만 한다. */
 "use strict";
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -330,7 +330,7 @@ function tabBody() {
       ${field("detail.enabled", "상세 확인(본문 + 이미지 글자)", "", "checkbox")}
       ${choice("detail.ocr", "이미지 글자 읽기", "tesseract와 한국어 데이터가 필요", [["tesseract", "tesseract"], ["none", "읽지 않음"]])}
       ${field("detail.images_max", "공고당 읽을 이미지 수", "큰 것부터", "number", 'min="0" max="12"')}
-      <p class="kj-hint kj-wide">직무 분류(roles)와 프록시는 config.json에서 고칩니다. 직무를 바꾼 뒤에는 <code>k-jobs reclassify</code>를 실행하세요.</p></div>`;
+      <p class="kj-hint kj-wide">직무 분류(roles)와 프록시는 config.json에서 고칩니다. 직무를 바꾼 뒤에는 <code>k-jobscore reclassify</code>를 실행하세요.</p></div>`;
   return `<div class="kj-form">
       ${field("ai.enabled", "AI 판단 켜기", "기본은 꺼짐. 단어 규칙을 통과한 공고만 보냅니다", "checkbox")}
       ${choice("ai.provider", "AI 종류", "", [["cli", "설치된 AI 명령어(키 없음)"], ["openai", "OpenAI 호환(OpenAI·Ollama·OpenRouter 등)"], ["anthropic", "Anthropic"]])}

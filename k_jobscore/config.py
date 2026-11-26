@@ -58,7 +58,7 @@ def _base(preset="infra-junior"):
             "cli_timeout": 300,
             "base_url": "https://api.openai.com/v1",
             "model": "",
-            "api_key_env": "KJOBS_AI_KEY",  # 키는 설정 파일이 아니라 환경변수에서만 읽는다
+            "api_key_env": "KJOBSCORE_AI_KEY",  # 키는 설정 파일이 아니라 환경변수에서만 읽는다
             "weight": 0.3,                 # 최종 점수 = 규칙 점수 × (1-w) + AI 점수 × w
             "min_rule_score": 50,          # 이 점수 이상인 공고만 AI에 보낸다(비용 제어)
             "max_per_run": 20,

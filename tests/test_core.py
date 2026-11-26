@@ -4,8 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from k_jobs import ai, config, export, filters, score, store, verify, view
-from k_jobs.normalize import career_range, deadline_norm, region
+from k_jobscore import ai, config, export, filters, score, store, verify, view
+from k_jobscore.normalize import career_range, deadline_norm, region
 
 CFG = config.load()
 
@@ -215,7 +215,7 @@ class ViewExport(unittest.TestCase):
             self.assertEqual(by["2"]["stage"], "title_minus")
             self.assertNotIn("d_body", by["1"])   # 본문은 화면으로 나가지 않는다
             line = export.to_career_ops(export.pick(out["items"], 60))
-            self.assertTrue(line.startswith("- [ ] https://example.com/1 | A/B | 클라우드 인프라 엔지니어 | 서울 | note: k-jobs 70점"))
+            self.assertTrue(line.startswith("- [ ] https://example.com/1 | A/B | 클라우드 인프라 엔지니어 | 서울 | note: k-jobscore 70점"))
 
 
 class OldDatabase(unittest.TestCase):

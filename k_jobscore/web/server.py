@@ -75,7 +75,7 @@ def make_handler(paths):
 
 def serve(paths, host="127.0.0.1", port=8765):
     srv = ThreadingHTTPServer((host, port), make_handler(paths))
-    print(f"k-jobs 화면: http://{host}:{port}  (끝내려면 Ctrl+C)")
+    print(f"k-jobscore 화면: http://{host}:{port}  (끝내려면 Ctrl+C)")
     if host not in ("127.0.0.1", "localhost", "::1"):
         print("주의: 로그인 없는 화면입니다. 다른 사람이 접속할 수 있는 주소로 열지 마세요.")
     try:

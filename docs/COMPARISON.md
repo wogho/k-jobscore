@@ -1,6 +1,6 @@
 # 비슷한 도구와의 차이
 
-| | career-ops | k-skill job-posting-match | k-jobs |
+| | career-ops | k-skill job-posting-match | k-jobscore |
 |---|---|---|---|
 | 대상 | 해외 채용 시스템(Greenhouse·Ashby·Lever 등) | 잡코리아·사람인 | 원티드·사람인·잡코리아·리멤버 |
 | 방식 | 로컬 도구 + AI 에이전트 | 요청할 때마다 AI 에이전트가 한 번 검색 | 정기 수집 + 로컬 화면, AI는 선택 |
@@ -11,4 +11,4 @@
 | 판정 근거 표시 | 보고서 | 추천 이유 | 단어별 점수 칩 + 조건 칩 |
 | 이력서·자소서 맞춤, 지원 추적 | ✓ | 지원 전략 제안 | career-ops로 내보내기 |
 
-k-jobs는 "한국 공고를 잘 골라 오는 부분"에 집중하고, 고른 뒤의 일은 career-ops에 맡깁니다.
+k-jobscore는 "한국 공고를 잘 골라 오는 부분"에 집중하고, 고른 뒤의 일은 career-ops에 맡깁니다.

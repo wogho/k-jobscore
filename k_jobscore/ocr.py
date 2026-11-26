@@ -20,7 +20,7 @@ def read_images(urls, referer, tmpdir, net, dcfg, site=None, log=print):
     try:
         from PIL import Image
     except ImportError:
-        log("  OCR 건너뜀: Pillow가 없습니다(pip install 'k-jobs[ocr]')")
+        log("  OCR 건너뜀: Pillow가 없습니다(pip install 'k-jobscore[ocr]')")
         return "", 0
     got = []
     for i, u in enumerate(urls[:12]):

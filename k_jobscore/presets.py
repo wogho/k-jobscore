@@ -1,4 +1,4 @@
-"""미리 만든 설정(프리셋). `k-jobs init --preset <이름>`으로 고르고, 이후 config.json에서 자유롭게 고친다.
+"""미리 만든 설정(프리셋). `k-jobscore init --preset <이름>`으로 고르고, 이후 config.json에서 자유롭게 고친다.
 
 직무(roles)는 제목 정규식 + 회사 종류(any / public 공공기관 / bank 은행권 / big 대기업)로 정의한다.
 roles가 비어 있으면 직무로 거르지 않는다(검색어로 모은 공고를 모두 남김).

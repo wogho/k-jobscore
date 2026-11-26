@@ -1,18 +1,18 @@
-"""k-jobs 명령어.
+"""k-jobscore 명령어.
 
-  k-jobs init [--preset infra-junior|dev-junior|all]   설정 파일 만들기
-  k-jobs collect [--only 사이트] [--no-detail]          목록 수집 + 상세 확인(+ AI 판단, 켰다면)
-  k-jobs enrich [--budget 초]                          밀린 상세 확인만
-  k-jobs ai [--limit N]                                AI 판단만(설정에서 켰을 때)
-  k-jobs ai --export 파일 [--limit N]                  에이전트 모드: 판정할 공고 내보내기(설정 없음, AGENTS.md)
-  k-jobs ai --import 파일                              에이전트 모드: 에이전트가 쓴 판정 넣기(인용 검사)
-  k-jobs list [--min 점수] [--limit N]                  점수 순 목록
-  k-jobs export --format csv|json|career-ops [-o 파일]  내보내기
-  k-jobs serve [--port 8765]                           웹 화면(내 컴퓨터에서만)
-  k-jobs suggest --resume 이력.txt                     이력 → 검색어·단어 초안(AI)
-  k-jobs reclassify                                    직무 설정을 바꾼 뒤 저장된 공고 다시 분류
-  k-jobs doctor                                        설치·설정·사이트 연결 점검
-데이터 폴더: $KJOBS_HOME 또는 ~/.k-jobs (config.json, jobs.sqlite3)
+  k-jobscore init [--preset infra-junior|dev-junior|all]   설정 파일 만들기
+  k-jobscore collect [--only 사이트] [--no-detail]          목록 수집 + 상세 확인(+ AI 판단, 켰다면)
+  k-jobscore enrich [--budget 초]                          밀린 상세 확인만
+  k-jobscore ai [--limit N]                                AI 판단만(설정에서 켰을 때)
+  k-jobscore ai --export 파일 [--limit N]                  에이전트 모드: 판정할 공고 내보내기(설정 없음, AGENTS.md)
+  k-jobscore ai --import 파일                              에이전트 모드: 에이전트가 쓴 판정 넣기(인용 검사)
+  k-jobscore list [--min 점수] [--limit N]                  점수 순 목록
+  k-jobscore export --format csv|json|career-ops [-o 파일]  내보내기
+  k-jobscore serve [--port 8765]                           웹 화면(내 컴퓨터에서만)
+  k-jobscore suggest --resume 이력.txt                     이력 → 검색어·단어 초안(AI)
+  k-jobscore reclassify                                    직무 설정을 바꾼 뒤 저장된 공고 다시 분류
+  k-jobscore doctor                                        설치·설정·사이트 연결 점검
+데이터 폴더: $KJOBSCORE_HOME 또는 ~/.k-jobscore (config.json, jobs.sqlite3)
 """
 import argparse
 import json
@@ -27,7 +27,7 @@ from .presets import PRESETS
 
 
 def home():
-    return Path(os.environ.get("KJOBS_HOME") or Path.home() / ".k-jobs").expanduser()
+    return Path(os.environ.get("KJOBSCORE_HOME") or Path.home() / ".k-jobscore").expanduser()
 
 
 def paths():
@@ -38,7 +38,7 @@ def paths():
 def _cfg():
     cfg_path, _, _ = paths()
     if not cfg_path.exists():
-        sys.exit(f"설정 파일이 없습니다: {cfg_path}\n먼저 `k-jobs init`을 실행하세요.")
+        sys.exit(f"설정 파일이 없습니다: {cfg_path}\n먼저 `k-jobscore init`을 실행하세요.")
     return config.load(cfg_path)
 
 
@@ -61,7 +61,7 @@ def cmd_init(a):
     config.save(cfg_path, cfg)
     print(f"설정을 만들었습니다: {cfg_path} (프리셋: {a.preset} — {PRESETS[a.preset]['label']})")
     print(f"AI 판단: {'켜짐 — 설치된 ' + use + ' 명령어 사용' if use != 'none' else '꺼짐(에이전트 모드는 설정 없이 쓸 수 있습니다: AGENTS.md)'}")
-    print("다음: 설정을 고친 뒤 `k-jobs collect`, 화면은 `k-jobs serve`.")
+    print("다음: 설정을 고친 뒤 `k-jobscore collect`, 화면은 `k-jobscore serve`.")
 
 
 def cmd_collect(a):
@@ -87,13 +87,13 @@ def cmd_ai(a):
         data = ai.export(c, cfg, limit=a.limit or 10)
         Path(a.export).write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
         print(f"판정할 공고 {len(data['items'])}건 → {a.export}")
-        print("다음: 각 공고를 판정해 결과 파일을 만든 뒤 `k-jobs ai --import 결과.json` (형식은 파일의 how 항목, AGENTS.md)")
+        print("다음: 각 공고를 판정해 결과 파일을 만든 뒤 `k-jobscore ai --import 결과.json` (형식은 파일의 how 항목, AGENTS.md)")
         return
     if a.import_file:
         ai.import_results(c, cfg, json.loads(Path(a.import_file).read_text(encoding="utf-8")))
         return
     if not cfg["ai"]["enabled"]:
-        sys.exit("AI 판단이 꺼져 있습니다(config.json의 ai.enabled). 설정 없이 쓰려면 에이전트 모드: k-jobs ai --export")
+        sys.exit("AI 판단이 꺼져 있습니다(config.json의 ai.enabled). 설정 없이 쓰려면 에이전트 모드: k-jobscore ai --export")
     ai.run(c, cfg, limit=a.limit)
 
 
@@ -153,7 +153,7 @@ def cmd_doctor(a):
     line(sys.version_info >= (3, 10), f"Python {sys.version.split()[0]} (3.10 이상)")
     try:
         cfg = config.load(cfg_path) if cfg_path.exists() else None
-        line(cfg is not None, f"설정 {cfg_path}" + ("" if cfg else " — `k-jobs init` 필요"))
+        line(cfg is not None, f"설정 {cfg_path}" + ("" if cfg else " — `k-jobscore init` 필요"))
     except ValueError as e:
         cfg = None
         line(False, f"설정 오류: {e}")
@@ -165,7 +165,7 @@ def cmd_doctor(a):
         import PIL  # noqa: F401
         line(True, "Pillow")
     except ImportError:
-        line(False, "Pillow 없음 — pip install 'k-jobs[ocr]'")
+        line(False, "Pillow 없음 — pip install 'k-jobscore[ocr]'")
     found = ai.detect_cli()
     print(("· " if found else "· ") + f"설치된 AI 명령어: {', '.join(found) if found else '없음'}(provider cli로 키 없이 쓸 수 있음)")
     if cfg and cfg["ai"]["enabled"]:
@@ -194,8 +194,8 @@ def cmd_doctor(a):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="k-jobs", description="한국 채용 사이트용 공고 적합도 필터")
-    ap.add_argument("--version", action="version", version=f"k-jobs {__version__}")
+    ap = argparse.ArgumentParser(prog="k-jobscore", description="한국 채용 사이트용 공고 적합도 필터")
+    ap.add_argument("--version", action="version", version=f"k-jobscore {__version__}")
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("init")
     p.add_argument("--preset", choices=list(PRESETS), default="infra-junior")

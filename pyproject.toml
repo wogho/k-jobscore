@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "k-jobs"
+name = "k-jobscore"
 version = "0.1.0"
 description = "한국 채용 사이트용 공고 적합도 필터 — 이미지 공고까지 읽고, 경력·학력 조건을 확인하고, 내가 정한 가점·감점 단어로 점수와 근거를 보여 줍니다."
 readme = "README.md"
@@ -18,13 +18,13 @@ dependencies = []
 ocr = ["Pillow>=10"]
 
 [project.urls]
-Homepage = "https://github.com/wogho/k-jobs"
+Homepage = "https://github.com/wogho/k-jobscore"
 
 [project.scripts]
-k-jobs = "k_jobs.cli:main"
+k-jobscore = "k_jobscore.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["k_jobs*"]
+include = ["k_jobscore*"]
 
 [tool.setuptools.package-data]
-"k_jobs.web" = ["static/*"]
+"k_jobscore.web" = ["static/*"]

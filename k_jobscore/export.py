@@ -38,6 +38,6 @@ def to_career_ops(items):
     lines = []
     for r in items:
         clean = lambda s: (s or "").replace("|", "/").strip()  # noqa: E731
-        lines.append(f"- [ ] {r['url']} | {clean(r['company'])} | {clean(r['title'])} | {clean(r['location']) or 'Korea'} | note: k-jobs {r['score']}점"
+        lines.append(f"- [ ] {r['url']} | {clean(r['company'])} | {clean(r['title'])} | {clean(r['location']) or 'Korea'} | note: k-jobscore {r['score']}점"
                      + (f", {clean(why(r))}" if why(r) else ""))
     return "\n".join(lines) + ("\n" if lines else "")
