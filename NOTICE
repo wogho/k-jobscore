@@ -1,0 +1,31 @@
+k-jobs
+Copyright (c) 2026 wogho — MIT License (see LICENSE)
+
+This project is based on career-ops
+  https://github.com/career-ops-hq/career-ops
+  MIT License, Copyright (c) 2026 Santiago Fernández de Valderrama
+  "career-ops" is a trademark of its maintainer. k-jobs is not affiliated with
+  or endorsed by the career-ops project; the name is used only to describe origin
+  and compatibility, as its TRADEMARK.md permits.
+  Ideas adapted (re-implemented in Python, no code copied):
+    - title keyword filtering (portals.yml title_filter)
+    - "drop only when the requirement is clear, otherwise keep and label"
+      (jd-years.mjs) — applied to Korean career/education requirements
+    - treating fetched posting text as untrusted input (posting-guard.mjs)
+    - optional, off-by-default integrations with keys in the environment (plugins/)
+  Export target: career-ops data/pipeline.md format ("- [ ] url | company | role | ...").
+
+Referenced
+  NomaDamas/k-skill — job-posting-match, jobkorea-talent-search
+    https://github.com/NomaDamas/k-skill  (MIT)
+    must-have / nice-to-have / negative-keyword structure, confidence labels
+    ("list-based" vs "detail-checked"), explicit hard boundaries.
+  Leonxlnx/taste-skill — UI design guidance
+    https://github.com/Leonxlnx/taste-skill  (MIT)
+
+Third-party software used at runtime (not bundled)
+  Tesseract OCR — Apache License 2.0
+  Pillow (optional) — MIT-CMU License
+
+If code from any of the projects above is copied into this repository in the
+future, the file must keep the original copyright notice at the top.

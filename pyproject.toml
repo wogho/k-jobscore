@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "k-jobs"
+version = "0.1.0"
+description = "한국 채용 사이트용 공고 적합도 필터 — 이미지 공고까지 읽고, 경력·학력 조건을 확인하고, 내가 정한 가점·감점 단어로 점수와 근거를 보여 줍니다."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "wogho" }]
+keywords = ["jobs", "korea", "job-search", "ocr", "career-ops", "채용"]
+classifiers = ["Programming Language :: Python :: 3", "License :: OSI Approved :: MIT License", "Natural Language :: Korean", "Operating System :: OS Independent"]
+dependencies = []
+
+[project.optional-dependencies]
+ocr = ["Pillow>=10"]
+
+[project.urls]
+Homepage = "https://github.com/wogho/k-jobs"
+
+[project.scripts]
+k-jobs = "k_jobs.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["k_jobs*"]
+
+[tool.setuptools.package-data]
+"k_jobs.web" = ["static/*"]

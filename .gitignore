@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.venv/
+.k-jobs/
+*.sqlite3
+config.json
+profile*.md
+resume*
+.env

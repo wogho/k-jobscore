@@ -1,0 +1,7 @@
+# 화면: http://127.0.0.1:8765 (내 컴퓨터에서만 열리게 127.0.0.1에만 묶음)
+# 수집: docker compose run --rm k-jobs k-jobs collect
+services:
+  k-jobs:
+    build: .
+    ports: ["127.0.0.1:8765:8765"]
+    volumes: ["./data:/data"]
