@@ -36,12 +36,13 @@ def collect(c, cfg, only=None, log=print):
         if not cfg["sources"].get(name) or (only and only != name):
             continue
         try:
-            rows, ids = [], set()
+            rows, ids, errs = [], set(), []
             for q in mod.queries(cfg):
                 try:
                     got = mod.search(ctx, q, cfg["pages"])
                 except Exception as e:  # noqa: BLE001 — 검색어 하나 실패는 건너뜀
-                    log(f"  {SITE_KO[name]} '{q}' 실패: {type(e).__name__}")
+                    errs.append(f"{type(e).__name__}: {e}"[:160])
+                    log(f"  {SITE_KO[name]} '{q}' 실패: {errs[-1]}")
                     continue
                 for p in got:
                     if p["sid"] not in ids:
@@ -51,7 +52,9 @@ def collect(c, cfg, only=None, log=print):
             c.executemany("insert or ignore into seen values(?,?,?)", [(p["source"], p["sid"], now) for p in rows])
             kept = [p for p in rows if passes(p, cfg)]
             new = store.save_postings(c, kept, now)
-            c.execute("insert into runs values(?,?,?,?,?,?)", (now, name, len(rows), len(kept), new, ""))
+            # 검색어가 모두 실패해 하나도 못 읽었으면 그 사이트 회차를 실패로 남긴다(화면의 '마지막 수집'에 이유가 보이게)
+            err = f"모든 검색어 실패({len(errs)}개) — {errs[0]}" if errs and not rows else ""
+            c.execute("insert into runs values(?,?,?,?,?,?)", (now, name, len(rows), len(kept), new, err[:300]))
             summary.append((name, len(rows), len(kept), new))
             log(f"{SITE_KO[name]}: 읽음 {len(rows)} · 조건 통과 {len(kept)} · 새 공고 {new}")
         except Exception as e:  # noqa: BLE001 — 한 사이트가 막혀도 나머지는 계속
