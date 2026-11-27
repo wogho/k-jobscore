@@ -190,6 +190,9 @@ def clean(cfg):
         raise ValueError("단어는 200개까지입니다")
     cfg["score"]["words"] = words
     cfg["dedup"]["enabled"] = bool(cfg["dedup"].get("enabled"))
+    for site, v in (cfg["network"].get("proxy") or {}).items():
+        if not (isinstance(v, str) or (isinstance(v, list) and all(isinstance(x, str) for x in v))):
+            raise ValueError(f"network.proxy.{site}는 주소 하나 또는 주소 목록(앞에서부터 시도)")
     oc = cfg["open_call"]
     oc["enabled"] = bool(oc.get("enabled"))
     if not set(oc.get("companies") or []) <= {"any", "bank", "public", "big"}:

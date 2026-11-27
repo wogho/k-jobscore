@@ -402,3 +402,31 @@ class Dedup(unittest.TestCase):
         self.assertEqual(t1, t2)
         self.assertEqual(run.call_count, 1)
         self.assertEqual(cache.hits, 1)
+
+
+class ProxyFallback(unittest.TestCase):
+    """프록시 여러 개: 연결이 안 되면 다음 주소로, 된 주소는 그 회차 동안 먼저(구매 경로와 같은 SBC → 노트북 순서)."""
+    def test_fallback_and_sticky(self):
+        from unittest import mock
+        from k_jobscore import http
+        cfg = {"network": {"proxy": {"saramin": ["socks5h://sbc:1080", "socks5h://laptop:1080"]}, "timeout": 5}}
+        net = http.Net(cfg)
+        seen = []
+
+        def fake(cmd, **kw):
+            px = cmd[cmd.index("--proxy") + 1]
+            seen.append(px)
+            return mock.Mock(returncode=7 if "sbc" in px else 0, stdout=b"ok\n200", stderr=b"")
+        with mock.patch.object(http.subprocess, "run", side_effect=fake):
+            self.assertEqual(net.get("https://x", site="saramin"), "ok")
+            self.assertEqual(net.get("https://y", site="saramin"), "ok")
+        self.assertEqual(seen, ["socks5h://sbc:1080", "socks5h://laptop:1080", "socks5h://laptop:1080"])
+
+    def test_site_http_error_is_not_route_failure(self):
+        from unittest import mock
+        from k_jobscore import http
+        net = http.Net({"network": {"proxy": {"saramin": "socks5h://a:1, socks5h://b:1"}}})
+        with mock.patch.object(http.subprocess, "run", return_value=mock.Mock(returncode=22, stdout=b"", stderr=b"403")) as run:
+            with self.assertRaises(RuntimeError):
+                net.get("https://x", site="saramin")
+        self.assertEqual(run.call_count, 1)   # 사이트가 막은 것(22)은 다른 경로로 반복하지 않는다

@@ -12,7 +12,7 @@
 | `network.delay_sec` | 3 | 요청 간격(초, 1~60) |
 | `network.timeout` | 30 | 요청 시간 제한(초) |
 | `network.user_agent` | 비움 | 비우면 일반 브라우저 값 |
-| `network.proxy.<사이트>` | 비움 | 본인 프록시(`socks5h://host:port`, `http://...`). curl 필요 |
+| `network.proxy.<사이트>` | 비움 | 본인 프록시(`socks5h://host:port`, `http://...`). 여러 개면 목록(또는 쉼표)으로 — 앞에서부터 쓰고 연결이 안 되면 다음 주소로. curl 필요 |
 | `roles[]` | 프리셋 | `{id, label, title(정규식), exclude_title, company: [any|public|bank|big]}`. 비우면 직무로 거르지 않음 |
 | `conditions.career.max_required_years` | 2 | 이 연수 이하를 요구하는 공고까지(0 = 신입만) |
 | `conditions.career.include_intern` | true | 인턴 공고 포함 |
