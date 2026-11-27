@@ -23,6 +23,9 @@ SECTION_HEAD = re.compile(r"모집\s*(?:부문|분야|직무|직군|요강|개�
                           r"직무\s*(?:소개|안내|및\s*자격)|채용\s*인원|모집\s*인원|recruit(?:ing)?\s*(?:field|position)", re.I)
 SECTION_END = re.compile(r"전형\s*(?:절차|일정|방법|안내)|접수\s*(?:기간|방법|안내)|지원\s*(?:방법|서류|기간)|제출\s*서류|복리\s*후생|복지|혜택|"
                          r"유의\s*사항|기타\s*사항|문의\s*처?|근무\s*조건|급여|처우", re.I)
+# 제목에 IT가 아닌 직무가 분명히 적힌 공채는 받지 않는다(11-28 최종검증: '공무직(시설경비원)', '(미화)', '대체인력(일반사무)')
+NON_IT_TITLE = r"경비|미화|청소|환경\s*미화|조리|급식|운전|기사\s*\(|시설\s*관리|소방|안전\s*관리|일반\s*사무|사무\s*보조|행정\s*보조|간호|요양|보육|돌봄|" \
+               r"상담원|안내원|주차|검침|배송|생산직|현장직|물류|영양사|사서|강사|연구원\s*\(?(?:생명|화학|바이오)"
 MIN_READABLE = 200   # 공백 뺀 글자 수 — 이보다 짧으면 링크뿐인 본문으로 본다
 
 
@@ -32,8 +35,16 @@ def opts(cfg):
 
 
 def is_open(title, company, cfg):
+    """공채형으로 받아 상세에서 직무를 확인할 공고인지. 제목에 IT가 아닌 직무가 적혔거나(open_call.exclude_title),
+    제목 감점·즉시 제외 단어가 있으면(상세를 읽지 않으므로 직무 확인이 끝나지 않는다) 받지 않는다."""
     on, kinds = opts(cfg)
-    return bool(on and OPEN_TITLE.search(title or "") and company_kinds(title, company) & kinds)
+    t = title or ""
+    if not (on and OPEN_TITLE.search(t) and company_kinds(t, company) & kinds):
+        return False
+    if re.search((cfg.get("open_call") or {}).get("exclude_title") or NON_IT_TITLE, t, re.I):
+        return False
+    from .score import score
+    return score(t, "", cfg, False)["stage"] not in ("title_minus", "veto")
 
 
 def section(text):

@@ -332,6 +332,8 @@ class OpenCall(unittest.TestCase):
         p = self.p("2026년 상반기 하나은행 신입행원 채용", "하나은행")
         self.assertTrue(filters.passes(p, self.cfg)); self.assertEqual(p["cats"], [opencall.OPEN])
         self.assertFalse(filters.passes(self.p("2026년 상반기 신입사원 채용", "작은회사(주)"), self.cfg))
+        self.assertFalse(filters.passes(self.p("2027년 공무직(시설경비원) 공개채용 공고", "근로복지공단"), self.cfg))   # IT 아닌 직무가 제목에
+        self.assertFalse(filters.passes(self.p("2027년 상반기 체험형 청년인턴 채용 공고(사업운영지원)", "한국농업기술진흥원"), self.cfg))   # 제목 감점(사업)
         self.cfg["open_call"]["enabled"] = False
         self.assertFalse(filters.passes(self.p("2026년 상반기 하나은행 신입행원 채용", "하나은행"), self.cfg))
 
