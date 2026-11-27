@@ -10,6 +10,8 @@ SCHEMA = [
     "create table if not exists seen(source text, sid text, at text, primary key(source, sid))",
     """create table if not exists details(source text, sid text, fetched_at text, body text, ocr text, images integer,
        career_v text, edu_v text, note text, error text, primary key(source, sid))""",
+    # 이미지 글자 읽기 결과 — 이미지 내용(sha1)·언어가 같으면 다시 읽지 않는다(dedup)
+    "create table if not exists ocr_cache(hash text, langs text, text text, at text, primary key(hash, langs))",
     """create table if not exists ai(source text, sid text, key text, at text, model text, fit integer, result text, error text,
        primary key(source, sid))""",
 ]
@@ -25,6 +27,20 @@ def connect(path):
         c.execute("alter table postings add column cats text default ''")
     c.commit()
     return c
+
+
+class OcrCache:
+    def __init__(self, c):
+        self.c, self.hits = c, 0
+
+    def get(self, h, langs):
+        r = self.c.execute("select text from ocr_cache where hash=? and langs=?", (h, langs)).fetchone()
+        if r:
+            self.hits += 1
+        return r[0] if r else None
+
+    def put(self, h, langs, text):
+        self.c.execute("insert or replace into ocr_cache values(?,?,?,datetime('now','localtime'))", (h, langs, text))
 
 
 def save_postings(c, rows, now):

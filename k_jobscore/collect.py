@@ -112,31 +112,34 @@ def enrich(c, cfg, lock_path, budget=None, limit=400, log=print):
     if changed:
         log(f"경력·학력 판정 다시 계산: {changed}건 바뀜")
     budget = budget or dcfg["budget_sec"]
-    rows = c.execute(f"""select p.source, p.sid, p.url, p.title, p.career, p.edu from postings p left join details d on d.source = p.source and d.sid = p.sid
+    rows = c.execute(f"""select p.source, p.sid, p.url, p.title, p.career, p.edu, p.company, p.location from postings p left join details d on d.source = p.source and d.sid = p.sid
                         where d.sid is null or (d.error != '' and d.fetched_at < datetime('now', 'localtime', '-{int(dcfg["retry_failed_after_h"])} hours'))
                         order by p.first_seen desc""").fetchall()
     rows = [r for r in rows if score.score(r[3], "", cfg, False)["stage"] == "pending"][:limit]   # 제목 감점·즉시 제외는 상세를 보지 않음
     net = Net(cfg)
     ctx = Ctx(cfg, net)
+    # 같은 이미지(여러 사이트에 함께 올린 공고·다시 올린 공고)는 글자를 다시 읽지 않는다 — 본문은 사이트마다 받는다
+    # (사이트마다 문구가 달라 요구조건을 잡을 기회가 늘어난다 — 11-28 실측: 같은 공고 22묶음 중 5묶음 판정이 사이트마다 달랐음)
+    cache = store.OcrCache(c) if cfg.get("dedup", {}).get("enabled", True) else None
     t0, done, imgs = time.time(), 0, 0
-    for source, sid, url, title, career, edu in rows:
+    for source, sid, url, title, career, edu, company, location in rows:
         if time.time() - t0 > budget:
             break
         now = datetime.now().isoformat(timespec="seconds")
         try:
             body, urls, edu_hint = SOURCES[source].detail(ctx, sid)
             with tempfile.TemporaryDirectory() as td:
-                text, n = ocr.read_images(urls, url, Path(td), net, dcfg, site=source, log=log)
+                text, n = ocr.read_images(urls, url, Path(td), net, dcfg, site=source, log=log, cache=cache)
             cv, ev, note = verify.verify(body + "\n" + text, career, edu_hint or edu, cfg["conditions"])
             c.execute("insert or replace into details values(?,?,?,?,?,?,?,?,?,?)", (source, sid, now, body[:60000], text[:60000], n, cv, ev, note, ""))
             if c.execute("select cats from postings where source=? and sid=?", (source, sid)).fetchone()[0] == opencall.OPEN:
-                comp = c.execute("select company from postings where source=? and sid=?", (source, sid)).fetchone()[0]
                 c.execute("update postings set cats=? where source=? and sid=?",
-                          (",".join(opencall.resolve(title, comp, body + "\n" + text, cfg)), source, sid))
+                          (",".join(opencall.resolve(title, company, body + "\n" + text, cfg)), source, sid))
             done, imgs = done + 1, imgs + n
         except Exception as e:  # noqa: BLE001
             c.execute("insert or replace into details values(?,?,?,?,?,?,?,?,?,?)", (source, sid, now, "", "", 0, "", "", "", f"{type(e).__name__}: {e}"[:300]))
         c.commit()
         time.sleep(min(2, net.delay))
-    log(f"상세 확인: {done}건(이미지 {imgs}장 글자 읽음) · 남은 {max(0, len(rows) - done)}건 · {int(time.time() - t0)}초")
+    hit = f" · 같은 이미지 글자 재사용 {cache.hits}장" if cache and cache.hits else ""
+    log(f"상세 확인: {done}건(이미지 {imgs}장 글자 읽음{hit}) · 남은 {max(0, len(rows) - done)}건 · {int(time.time() - t0)}초")
     return done

@@ -58,6 +58,12 @@ def items(c, cfg, now=None):
         r["cat_from"] = "body" if BODY in raw else "open" if OPEN in raw else "title"
         r["cats"] = [x for x in raw if x != BODY]
         out.append(r)
+    if cfg.get("dedup", {}).get("enabled", True):
+        from .dedup import group
+        out = group(out)   # 여러 사이트·다시 올린 같은 공고는 한 줄로(나머지는 also)
+    else:
+        for r in out:
+            r["also"] = []
     runs = [dict(zip(("at", "source", "fetched", "kept", "new", "error"), x)) for x in c.execute(
         "select r.* from runs r join (select source, max(at) at from runs group by source) m on r.source = m.source and r.at = m.at")] if "runs" in have else []
     return {"items": out, "runs": runs, "sites": SITE_KO, "checked": checked,

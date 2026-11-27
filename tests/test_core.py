@@ -360,3 +360,45 @@ class OpenCall(unittest.TestCase):
         out = view.items(c, self.cfg)["items"]
         self.assertEqual([x["sid"] for x in out], ["1"])   # 맞는 직무 없는 공채는 화면에서 빠짐
         self.assertEqual((out[0]["cat_from"], out[0]["cats"]), ("body", ["security", "digital"]))
+
+
+class Dedup(unittest.TestCase):
+    """같은 공고 묶기 — 화면 한 줄, 다른 사이트에서 읽은 상세 재사용."""
+    def test_key(self):
+        from k_jobscore import dedup
+        k = dedup.key("[클루커스] Cloud Engineer (AI, GCP) 모집", "(주)클루커스", "서울 강남구")
+        self.assertEqual(k, dedup.key("[클루커스] Cloud Engineer (AI, GCP) 모집", "클루커스", "서울특별시 강남구"))
+        self.assertEqual(dedup.key("IDC / 클라우드 신입 엔지니어 채용", "브이랜24", "서울"), dedup.key("IDC 클라우드 신입 엔지니어 채용", "브이랜24", "서울"))
+        self.assertNotEqual(dedup.key("[공덕] 보안 관제 엔지니어", "A", "서울"), dedup.key("[아산] 보안 관제 엔지니어", "A", "서울"))   # 근무지 꼬리표는 남김
+        self.assertNotEqual(dedup.key("보안 관제 엔지니어", "A", "서울"), dedup.key("보안 관제 엔지니어", "B", "서울"))
+
+    def test_view_groups_with_strictest_verdict(self):
+        c = store.connect(":memory:")
+        base = {"url": "u", "title": "[클루커스] Cloud Engineer 모집", "company": "클루커스", "location": "서울", "career": "신입", "career_min": 0,
+                "edu": "무관", "emp_type": "", "cats": ["infra"]}
+        store.save_postings(c, [dict(base, source="saramin", sid="1", deadline="2099-12-31"),
+                                dict(base, source="jobkorea", sid="9", deadline="2099-12-01", company="(주)클루커스")], "2099-01-01T00:00:00")
+        c.execute("insert into details values('saramin','1','x','클라우드 운영 신입','',0,'ok','ok','','')")
+        c.execute("insert into details values('jobkorea','9','x','관련 경력 10년 이상','',0,'fail','ok','경력 10년 이상 요구','')")
+        items = view.items(c, CFG)["items"]
+        self.assertEqual(len(items), 1)
+        self.assertEqual((items[0]["source"], items[0]["verdict"]), ("jobkorea", "drop"))   # 한 사이트라도 불일치면 그것을 대표로
+        self.assertEqual(items[0]["also"][0]["source"], "saramin")
+
+    def test_ocr_cache_skips_same_image(self):
+        from unittest import mock
+        from k_jobscore import ocr
+        c = store.connect(":memory:")
+        cache = store.OcrCache(c)
+        dcfg = dict(CFG["detail"], img_min_w=1, img_min_h=1)
+        with tempfile.TemporaryDirectory() as d:
+            from PIL import Image
+            src = Path(d) / "src.png"; Image.new("RGB", (40, 40), "white").save(src)
+            net = mock.Mock(download=lambda u, f, ref, site=None: Path(f).write_bytes(src.read_bytes()))
+            run = mock.Mock(return_value=mock.Mock(stdout="경력 3년 이상", returncode=0))
+            with mock.patch.object(ocr, "available", return_value=True), mock.patch.object(ocr.subprocess, "run", run):
+                t1 = ocr.read_images(["a"], "r", Path(d), net, dcfg, cache=cache)
+                t2 = ocr.read_images(["b"], "r", Path(d), net, dcfg, cache=cache)   # 다른 주소 · 같은 이미지
+        self.assertEqual(t1, t2)
+        self.assertEqual(run.call_count, 1)
+        self.assertEqual(cache.hits, 1)

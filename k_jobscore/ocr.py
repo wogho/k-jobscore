@@ -3,6 +3,7 @@
 엔진: tesseract(기본, `tesseract-ocr-kor` 필요) / none. 로고·아이콘 같은 작은 이미지는 건너뛰고 큰 것부터 읽는다.
 tesseract 자동 반전은 켜 둔다 — 끄면 빠르지만 어두운 바탕의 흰 글씨를 영문 잡음으로 읽는다.
 """
+import hashlib
 import os
 import re
 import shutil
@@ -13,8 +14,8 @@ def available(engine):
     return engine == "tesseract" and shutil.which("tesseract") is not None
 
 
-def read_images(urls, referer, tmpdir, net, dcfg, site=None, log=print):
-    """→ (글, 읽은 장수)."""
+def read_images(urls, referer, tmpdir, net, dcfg, site=None, log=print, cache=None):
+    """→ (글, 읽은 장수). cache(store.OcrCache)가 있으면 같은 이미지(내용 sha1)는 다시 읽지 않는다."""
     if not urls or dcfg.get("ocr", "tesseract") == "none" or not available(dcfg.get("ocr", "tesseract")):
         return "", 0
     try:
@@ -32,11 +33,15 @@ def read_images(urls, referer, tmpdir, net, dcfg, site=None, log=print):
             if w >= dcfg["img_min_w"] and h >= dcfg["img_min_h"]:
                 g = tmpdir / f"g{i}.png"
                 im.convert("L").save(g)
-                got.append((w * h, g))
+                got.append((w * h, g, hashlib.sha1(f.read_bytes()).hexdigest()))
         except Exception:  # noqa: BLE001 — 이미지 하나 실패는 건너뜀
             continue
     texts = []
-    for _, g in sorted(got, reverse=True)[:dcfg["images_max"]]:
+    langs = dcfg.get("ocr_langs", "kor+eng")
+    for _, g, h in sorted(got, reverse=True)[:dcfg["images_max"]]:
+        if cache is not None and (t := cache.get(h, langs)) is not None:
+            texts.append(t)
+            continue
         try:
             cmd = ["tesseract", str(g), "stdout", "-l", dcfg.get("ocr_langs", "kor+eng")]
             if shutil.which("nice"):
@@ -44,6 +49,8 @@ def read_images(urls, referer, tmpdir, net, dcfg, site=None, log=print):
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=dcfg["ocr_timeout"],
                                env={**os.environ, "OMP_THREAD_LIMIT": "2"})
             texts.append(r.stdout)
+            if cache is not None and r.returncode == 0:
+                cache.put(h, langs, r.stdout)
         except Exception as e:  # noqa: BLE001
             log(f"  OCR 실패 {type(e).__name__}")
     return "\n".join(re.sub(r"[ \t]+", " ", t) for t in texts), len(texts)

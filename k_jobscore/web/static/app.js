@@ -47,7 +47,7 @@ const S = {
 function filtered() {
   const f = S.f, s = f.q.trim().toLowerCase();
   const out = S.data.items.filter((j) => {
-    if (!f.sites.includes(j.source) || !f.edu.includes(j.edu) || !j.cats.some((c) => f.roles.includes(c))) return false;
+    if (![j.source, ...(j.also || []).map((a) => a.source)].some((x) => f.sites.includes(x)) || !f.edu.includes(j.edu) || !j.cats.some((c) => f.roles.includes(c))) return false;
     if (f.career === "new" && !/신입|무관/.test(j.career)) return false;
     if (f.career === "intern" && !/인턴/.test(j.title + j.emp_type)) return false;
     if (f.career === "exp" && !((j.career_min ?? 0) >= 1)) return false;
@@ -108,7 +108,7 @@ function row(j) {
       <p class="kj-row__tags"><span class="kj-row__job">${esc(j.cats.map((c) => roles[c] || c).join(", "))}</span>${j.cat_from === "body" ? `<span class="kj-row__open">공채 · 모집 부문에서 확인</span>` : ""}${j.career ? `<span>${esc(j.career)}</span>` : ""}
         <span>${esc(EDU_LABEL[j.edu] || j.edu)}</span>${j.emp_type ? `<span>${esc(j.emp_type)}</span>` : ""}</p>${why(j)}</div>
     <div class="kj-row__side"><span class="kj-row__due ${dd.days !== null && dd.days <= 3 ? "is-soon" : ""}">${esc(dd.text)}</span>
-      <span class="kj-row__src">${isNew(j) ? `<span class="kj-dot" aria-label="새 공고"></span>` : ""}${esc(S.data.sites[j.source])}</span></div></a></li>`;
+      <span class="kj-row__src">${isNew(j) ? `<span class="kj-dot" aria-label="새 공고"></span>` : ""}${esc(S.data.sites[j.source])}</span>${(j.also || []).length ? `<span class="kj-row__also" title="같은 공고를 올린 다른 사이트">+ ${esc([...new Set(j.also.map((a) => S.data.sites[a.source] || a.source))].join("·"))}</span>` : ""}</div></a></li>`;
 }
 
 function check(type, name, value, on, label, note, count) {
@@ -163,7 +163,7 @@ function renderSites() {
   $("#kj-sites").innerHTML = Object.entries(S.data.sites).map(([s, name]) => {
     const on = S.f.sites.includes(s);
     return `<button type="button" class="kj-site ${on ? "is-on" : ""}" aria-pressed="${on}" data-site="${s}"><span class="kj-site__check" aria-hidden="true">${on ? "✓" : ""}</span>
-      <span class="kj-site__name">${esc(name)}</span><span class="kj-site__n">${items.filter((j) => j.source === s).length}</span></button>`;
+      <span class="kj-site__name">${esc(name)}</span><span class="kj-site__n">${items.filter((j) => j.source === s || (j.also || []).some((a) => a.source === s)).length}</span></button>`;
   }).join("");
 }
 
