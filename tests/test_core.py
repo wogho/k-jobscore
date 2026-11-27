@@ -313,3 +313,50 @@ class AI(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OpenCall(unittest.TestCase):
+    """은행·공공·대기업 공채(제목에 직무 없음) — 본문 모집 부문으로 직무 확인."""
+    HANA = ("하나은행 소개\n디지털 금융을 선도하는 IT 역량을 갖춘 인재\n모집부문\n일반\n디지털/ICT\n정보보안\n지원자격\n학력 무관\n"
+            "전형절차\n서류 → 면접\n" + "안내 문구 " * 40)
+
+    def setUp(self):
+        self.cfg = config.load(preset="infra-junior")
+
+    def p(self, title, company):
+        return {"source": "saramin", "sid": "1", "url": "u", "title": title, "company": company, "location": "서울", "career": "신입",
+                "career_min": 0, "edu": "무관", "emp_type": "정규직", "deadline": "2099-12-31"}
+
+    def test_list_stage_keeps_open_call_only_for_big_bank_public(self):
+        from k_jobscore import opencall
+        p = self.p("2026년 상반기 하나은행 신입행원 채용", "하나은행")
+        self.assertTrue(filters.passes(p, self.cfg)); self.assertEqual(p["cats"], [opencall.OPEN])
+        self.assertFalse(filters.passes(self.p("2026년 상반기 신입사원 채용", "작은회사(주)"), self.cfg))
+        self.cfg["open_call"]["enabled"] = False
+        self.assertFalse(filters.passes(self.p("2026년 상반기 하나은행 신입행원 채용", "하나은행"), self.cfg))
+
+    def test_resolve_from_section_not_company_blurb(self):
+        from k_jobscore import opencall
+        cats = opencall.resolve("2026년 상반기 하나은행 신입행원 채용", "하나은행", self.HANA, self.cfg)
+        self.assertIn("security", cats); self.assertIn("digital", cats); self.assertIn(opencall.BODY, cats)
+        none = self.HANA.replace("디지털/ICT\n정보보안\n", "영업점 창구\n")
+        self.assertEqual(opencall.resolve("2026 하나은행 신입행원 채용", "하나은행", none, self.cfg), [opencall.EXCLUDED])   # 회사 소개의 '디지털·IT'에는 안 걸림
+        self.assertEqual(opencall.resolve("2026 하나은행 신입행원 채용", "하나은행", "채용 홈페이지에서 지원하세요", self.cfg), [opencall.OPEN])   # 링크뿐 → 보류
+
+    def test_db_flow_keeps_body_roles_and_hides_excluded(self):
+        from k_jobscore import collect, opencall
+        c = store.connect(":memory:")
+        a, b = self.p("2026년 상반기 하나은행 신입행원 채용", "하나은행"), self.p("2026년 하반기 신입행원 채용", "국민은행")
+        b["sid"] = "2"
+        for p in (a, b):
+            filters.passes(p, self.cfg)
+        store.save_postings(c, [a, b], "2026-11-27T00:00:00")
+        c.execute("insert into details values('saramin','1','x',?, '', 0, 'ok', 'ok', '', '')", (self.HANA,))
+        c.execute("insert into details values('saramin','2','x',?, '', 0, 'ok', 'ok', '', '')", (self.HANA.replace("디지털/ICT\n정보보안\n", "영업점\n"),))
+        collect.reclassify(c, self.cfg)
+        self.assertEqual(c.execute("select cats from postings where sid='1'").fetchone()[0], "security,digital,_body")
+        store.save_postings(c, [dict(a, cats=[opencall.OPEN])], "2026-11-28T00:00:00")   # 다음 목록 회차가 되돌리지 않음
+        self.assertEqual(c.execute("select cats from postings where sid='1'").fetchone()[0], "security,digital,_body")
+        out = view.items(c, self.cfg)["items"]
+        self.assertEqual([x["sid"] for x in out], ["1"])   # 맞는 직무 없는 공채는 화면에서 빠짐
+        self.assertEqual((out[0]["cat_from"], out[0]["cats"]), ("body", ["security", "digital"]))

@@ -13,7 +13,8 @@ REGION = re.compile(r"^(서울|경기|인천|부산|대구|광주|대전|울산|
 
 
 def queries(cfg):
-    return list(cfg["queries"])
+    oc = cfg.get("open_call") or {}
+    return list(cfg["queries"]) + ([q for q in oc.get("queries", []) if q not in cfg["queries"]] if oc.get("enabled") else [])
 
 
 def search(ctx, query, pages):

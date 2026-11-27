@@ -65,7 +65,10 @@ def passes(p, cfg):
     c = cfg["conditions"]
     p["cats"] = categorize(p["title"], p.get("company", ""), cfg["roles"])
     if not p["cats"]:
-        return False
+        from . import opencall   # 은행·공공·대기업 공채는 제목에 직무가 없다 — 상세의 모집 부문에서 확인(opencall.py)
+        if not opencall.is_open(p["title"], p.get("company", ""), cfg):
+            return False
+        p["cats"] = [opencall.OPEN]
     text = p["title"] + " " + p.get("emp_type", "")
     if any(x and x in text for x in c["employment_exclude"]):
         return False

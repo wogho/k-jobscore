@@ -9,7 +9,8 @@ EDU = {"none": "무관", "high_school": "고졸", "associate": "초대졸", "bac
 
 
 def queries(cfg):
-    return list(cfg["queries"])
+    oc = cfg.get("open_call") or {}
+    return list(cfg["queries"]) + ([q for q in oc.get("queries", []) if q not in cfg["queries"]] if oc.get("enabled") else [])
 
 
 def search(ctx, query, pages):

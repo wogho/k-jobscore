@@ -31,6 +31,9 @@
 | `score.title_minus_skips_detail` | true | 제목에 감점 단어가 있으면 상세를 보지 않음 |
 | `score.tiers` | 70 / 50 / 30 | 높음·보통·낮음 기준(원 색) |
 | `score.words[]` | 프리셋 | 아래 참고 |
+| `open_call.enabled` | true | 제목에 직무가 없는 공채(예: "2026년 상반기 신입행원 채용")를 버리지 않고, 상세의 **모집 부문** 단락으로 직무를 확인. 맞는 직무가 없으면 화면에서 빼고, 모집 부문을 읽을 수 없으면(채용 사이트 링크뿐) 보류 |
+| `open_call.companies` | `["bank", "public", "big"]` | 공채로 볼 회사 종류(은행 · 공공기관 · 대기업, `any` = 모든 회사) |
+| `open_call.queries` | `["신입행원", "공개채용", "신입사원 채용"]` | 공채를 찾으려고 사람인·잡코리아·리멤버에 더 넣는 검색어 |
 | `detail.enabled` | true | 상세 확인 |
 | `detail.ocr` | tesseract | `tesseract` / `none` |
 | `detail.ocr_langs` | `kor+eng` | tesseract 언어 |

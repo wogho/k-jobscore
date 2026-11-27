@@ -4,7 +4,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from . import ocr, score, store, verify
+from . import ocr, opencall, score, store, verify
 from .config import SITE_KO
 from .filters import categorize, passes
 from .http import Net
@@ -16,6 +16,9 @@ def reclassify(c, cfg):
     keep = drop = 0
     for source, sid, title, company in c.execute("select source, sid, title, company from postings").fetchall():
         cats = categorize(title, company, cfg["roles"])
+        if not cats and opencall.is_open(title, company, cfg):
+            d = c.execute("select coalesce(body,''), coalesce(ocr,''), error from details where source=? and sid=?", (source, sid)).fetchone()
+            cats = opencall.resolve(title, company, d[0] + "\n" + d[1], cfg) if d and not d[2] else [opencall.OPEN]
         if cats:
             c.execute("update postings set cats=? where source=? and sid=?", (",".join(cats), source, sid))
             keep += 1
@@ -126,6 +129,10 @@ def enrich(c, cfg, lock_path, budget=None, limit=400, log=print):
                 text, n = ocr.read_images(urls, url, Path(td), net, dcfg, site=source, log=log)
             cv, ev, note = verify.verify(body + "\n" + text, career, edu_hint or edu, cfg["conditions"])
             c.execute("insert or replace into details values(?,?,?,?,?,?,?,?,?,?)", (source, sid, now, body[:60000], text[:60000], n, cv, ev, note, ""))
+            if c.execute("select cats from postings where source=? and sid=?", (source, sid)).fetchone()[0] == opencall.OPEN:
+                comp = c.execute("select company from postings where source=? and sid=?", (source, sid)).fetchone()[0]
+                c.execute("update postings set cats=? where source=? and sid=?",
+                          (",".join(opencall.resolve(title, comp, body + "\n" + text, cfg)), source, sid))
             done, imgs = done + 1, imgs + n
         except Exception as e:  # noqa: BLE001
             c.execute("insert or replace into details values(?,?,?,?,?,?,?,?,?,?)", (source, sid, now, "", "", 0, "", "", "", f"{type(e).__name__}: {e}"[:300]))

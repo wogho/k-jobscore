@@ -48,6 +48,8 @@ def _base(preset="infra-junior"):
             "tiers": {"high": 70, "mid": 50, "low": 30},
             "words": [{"word": w, "kind": "plus"} for w in p["plus"]] + [{"word": w, "kind": "minus"} for w in p["minus"]],
         },
+        # 은행·공공·대기업 공채(제목에 직무 없음)는 본문 모집 부문으로 직무 확인 — opencall.py
+        "open_call": {"enabled": True, "companies": ["bank", "public", "big"], "queries": ["신입행원", "공개채용", "신입사원 채용"]},
         "detail": {"enabled": True, "ocr": "tesseract", "ocr_langs": "kor+eng", "images_max": 4, "img_min_w": 300, "img_min_h": 200,
                    "ocr_timeout": 240, "budget_sec": 1500, "retry_failed_after_h": 6},
         "ai": {
@@ -186,6 +188,12 @@ def clean(cfg):
     if len(words) > 200:
         raise ValueError("단어는 200개까지입니다")
     cfg["score"]["words"] = words
+    oc = cfg["open_call"]
+    oc["enabled"] = bool(oc.get("enabled"))
+    if not set(oc.get("companies") or []) <= {"any", "bank", "public", "big"}:
+        raise ValueError("open_call.companies는 any · bank · public · big 중에서")
+    if not isinstance(oc.get("queries"), list) or len(oc["queries"]) > 20 or not all(isinstance(x, str) for x in oc["queries"]):
+        raise ValueError("open_call.queries는 문자열 목록(20개까지)")
     if cfg["ai"]["provider"] not in ("openai", "anthropic", "cli"):
         raise ValueError("ai.provider는 openai · anthropic · cli 중 하나")
     if cfg["ai"]["cli"] not in ("auto", "claude", "codex", "gemini"):

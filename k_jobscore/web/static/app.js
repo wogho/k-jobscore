@@ -105,7 +105,7 @@ function row(j) {
   return `<li><a class="kj-row" href="${esc(j.url)}" target="_blank" rel="noreferrer">${ring(j)}
     <div class="kj-row__main"><p class="kj-row__title">${esc(j.title)}</p>
       <p class="kj-row__meta">${esc(j.company)}${j.location ? `<span> · ${esc(j.location)}</span>` : ""}</p>
-      <p class="kj-row__tags"><span class="kj-row__job">${esc(j.cats.map((c) => roles[c] || c).join(", "))}</span>${j.career ? `<span>${esc(j.career)}</span>` : ""}
+      <p class="kj-row__tags"><span class="kj-row__job">${esc(j.cats.map((c) => roles[c] || c).join(", "))}</span>${j.cat_from === "body" ? `<span class="kj-row__open">공채 · 모집 부문에서 확인</span>` : ""}${j.career ? `<span>${esc(j.career)}</span>` : ""}
         <span>${esc(EDU_LABEL[j.edu] || j.edu)}</span>${j.emp_type ? `<span>${esc(j.emp_type)}</span>` : ""}</p>${why(j)}</div>
     <div class="kj-row__side"><span class="kj-row__due ${dd.days !== null && dd.days <= 3 ? "is-soon" : ""}">${esc(dd.text)}</span>
       <span class="kj-row__src">${isNew(j) ? `<span class="kj-dot" aria-label="새 공고"></span>` : ""}${esc(S.data.sites[j.source])}</span></div></a></li>`;

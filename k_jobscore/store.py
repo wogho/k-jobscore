@@ -31,7 +31,10 @@ def save_postings(c, rows, now):
     new = 0
     for p in rows:
         cats = ",".join(p.get("cats") or [])
-        if c.execute("select 1 from postings where source=? and sid=?", (p["source"], p["sid"])).fetchone():
+        old = c.execute("select cats from postings where source=? and sid=?", (p["source"], p["sid"])).fetchone()
+        if old and cats == "_open" and old[0]:
+            cats = old[0]   # 공채형: 상세 모집 부문에서 이미 정한 직무를 목록 회차가 '확인 중'으로 되돌리지 않게
+        if old:
             c.execute("update postings set title=?, company=?, location=?, career=?, career_min=?, edu=?, emp_type=?, deadline=?, last_seen=?, cats=? "
                       "where source=? and sid=?", (p["title"], p["company"], p["location"], p["career"], p["career_min"], p["edu"], p["emp_type"],
                                                     p["deadline"], now, cats, p["source"], p["sid"]))
