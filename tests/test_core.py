@@ -133,6 +133,21 @@ class Verify(unittest.TestCase):
 
     def test_major_required(self):
         self.assertIn("전공 필수", verify.verify("컴퓨터공학 전공자 필수")[2])
+        # 본문이 분명히 요구하면 목록의 '경력무관'보다 본문 우선
+        self.assertEqual(verify.verify("자격요건\n경력 : 경력 3년 이상", career="경력무관")[0], "fail")
+        self.assertEqual(verify.verify("자격요건\n- 신입 또는 3년 이하 경력", career="신입")[0], "ok")
+        # '아래 중 하나' 갈래: 모두 안 맞으면 불일치, 하나라도 맞으면 통과
+        t = ("이런 분을 찾고 있어요\n- 아래 중 하나의 요건을 충족하는 경우 지원 가능합니다.\n- 현업 경력 3년 이상이며, 출시 경험\n"
+             "- 유관 분야의 석·박사 학위 보유자로, 실무 또는 교육 경험이 1년 이상이신 분")
+        cv, ev, note = verify.verify(t, career="경력무관", edu="무관")
+        self.assertEqual(cv, "fail"); self.assertIn("요건 중 하나", note)
+        t2 = t.replace("석·박사 학위 보유자로", "전문대 졸업자로")
+        self.assertEqual(verify.verify(t2, career="경력무관", edu="무관")[0], "ok")
+        # 학력: 2·3년제 포함 표현은 초대졸, 애매한 '대졸 이상'은 목록 표기, 분명한 학사·4년제는 본문 우선
+        for x in ("학력 : 대졸이상(2,3년)", "(전문)학사 이상", "전문학사 이상 학위 보유자"):
+            self.assertEqual(verify.verify("자격요건\n" + x, edu="무관")[1], "ok", x)
+        self.assertEqual(verify.verify("자격요건\n학력 : 대졸이상", edu="초대졸")[1], "ok")
+        self.assertEqual(verify.verify("자격요건\n관련 전공(기계 등) 학사 이상", edu="무관")[1], "fail")
         self.assertNotIn("전공 필수", verify.verify("우대사항\n컴퓨터공학 전공자")[2])
 
 
