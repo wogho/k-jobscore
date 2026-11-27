@@ -31,6 +31,14 @@ AGENCY = re.compile(r"인력|휴먼|파워|서치|아웃소싱|에이치알|HR|�
 NON_IT_TITLE = r"마케팅|마케터|\bMD\b|머천다이저|디자이너|회계|세무|노무|법무|홍보|상담|텔러|대출|콜센터|\bTM\b|아웃바운드|인바운드|영업|보험\s*설계|금융\s*플래너|설계사|간호사|경비|미화|청소|환경\s*미화|조리|급식|운전|기사\s*\(|시설\s*관리|소방|안전\s*관리|일반\s*사무|사무\s*보조|행정\s*보조|간호|요양|보육|돌봄|" \
                r"상담원|안내원|주차|검침|배송|생산직|현장직|물류|영양사|사서|강사|연구원\s*\(?(?:생명|화학|바이오)"
 MIN_READABLE = 200   # 공백 뺀 글자 수 — 이보다 짧으면 링크뿐인 본문으로 본다
+SHORT_LINE = 40      # 모집 부문에서 직무를 찾을 줄의 최대 길이
+# 본문에서는 제목용 표현이 너무 넓은 직무 — '개발'(기획개발·인재개발원), '데이터'(데이터 입력), '네트워크 구축'(투자사 네트워크)에 걸리지 않게
+# 좁은 표현을 쓴다. 직무에 body 정규식이 있으면 그것을, 없으면 여기(프리셋 직무 id), 그것도 없으면 제목 표현을 쓴다.
+BODY_RX = {
+    "digital": r"디지털|\bICT\b|\bIT\b|전산|정보\s*기술|정보\s*시스템|정보화|소프트웨어|\bSW\b|AI\s*[·/]?\s*(?:AX|플랫폼|인프라|서비스)|\bAX\b",
+    "infra": r"시스템\s*(?:엔지니어|운영|관리|구축)|IT\s*인프라|(?:AI|클라우드|서버|전산|네트워크|정보)\s*인프라|서버\s*(?:엔지니어|관리|운영)|"
+             r"클라우드|네트워크\s*(?:엔지니어|장비|운영)|리눅스|linux|데이터\s*센터",
+}
 
 
 def opts(cfg):
@@ -46,7 +54,8 @@ def is_open(title, company, cfg):
     if not on:
         return False
     own = company_kinds("", company) & kinds                                        # 회사 이름 자체가 은행·공공·대기업
-    weak = own and WEAK_OPEN_TITLE.search(t)                                         # + '채용·모집'
+    # '…채용공고'만으로 공채로 보는 것은 공공·은행만 — 대기업은 개별 공고(차량관리·재고관리 등)가 많아 공채 표현이 있어야 한다(11-28 실수집)
+    weak = (own & {"public", "bank"}) and WEAK_OPEN_TITLE.search(t)
     strong = OPEN_TITLE.search(t) and company_kinds(t, company) & kinds and (own or not AGENCY.search(company or ""))   # 제목으로만 잡히면 인력·대행 회사 제외
     if not (strong or weak):
         return False
@@ -81,7 +90,9 @@ def body_roles(title, company, text, roles):
         if not kinds & set(r.get("company") or ["any"]):
             continue
         for line in sec.splitlines():
-            if _rx(r["title"]).search(line) and not (r.get("exclude_title") and _rx(r["exclude_title"]).search(line)):
+            if len(line) > SHORT_LINE:
+                continue   # 부문 이름·표 칸 같은 짧은 줄만 — 업무 설명 문장의 '개발·데이터'에 걸리지 않게(11-28 실수집: 물리치료사·매장 관리가 디지털로)
+            if _rx(r.get("body") or BODY_RX.get(r["id"]) or r["title"]).search(line) and not (r.get("exclude_title") and _rx(r["exclude_title"]).search(line)):
                 out.append(r["id"])
                 break
     return out, bool(sec)

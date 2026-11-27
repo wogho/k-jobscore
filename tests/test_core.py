@@ -450,3 +450,13 @@ class CompanySize(unittest.TestCase):
         self.assertFalse(opencall.is_open("[하나은행] 주간 인바운드 상담사 채용", "(주)블루에이치알", cfg))
         self.assertFalse(opencall.is_open("우리은행 대출상담사 모집", "에이플러스모기지(주)", cfg))
         self.assertTrue(opencall.is_open("2026년 신규직원 채용 공고", "한국산업인력공단", cfg))   # '인력'이 들어간 공공기관
+
+
+class OpenCallBody(unittest.TestCase):
+    def test_body_roles_ignore_generic_words(self):
+        from k_jobscore import opencall
+        cfg = config.load(preset="infra-junior")
+        t = "모집부문\n일반\n- 차기작 기획개발지원 정산 보조\n- 인재개발원 교육\n- 투자사 네트워크 구축:관리\n전형절차\n" + "안내 " * 80
+        self.assertEqual(opencall.resolve("2027년 상반기 인턴 공개채용", "영화진흥위원회", t, cfg), [opencall.EXCLUDED])
+        t2 = "모집부문\n디지털/ICT\n정보시스템 구축 및 지원 업무\n전형절차\n" + "안내 " * 80
+        self.assertIn("digital", opencall.resolve("2027년 상반기 공개채용", "영화진흥위원회", t2, cfg))
