@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 from . import score as sc
 from .config import SITE_KO
-from .filters import judge
+from .filters import SIZE_KO, company_size, judge
 from .opencall import BODY, EXCLUDED, OPEN, scoring_text
 
 
@@ -56,6 +56,7 @@ def items(c, cfg, now=None):
             r["verdict"] = "hold"   # 공채형인데 모집 부문을 읽지 못함(회사 채용 사이트 링크뿐 등) — 보류
         r["tier"] = sc.tier(r["score"], cfg)
         r["cat_from"] = "body" if BODY in raw else "open" if OPEN in raw else "title"
+        r["size"] = company_size(r["title"], r["company"])
         r["cats"] = [x for x in raw if x != BODY]
         out.append(r)
     if cfg.get("dedup", {}).get("enabled", True):
@@ -66,5 +67,5 @@ def items(c, cfg, now=None):
             r["also"] = []
     runs = [dict(zip(("at", "source", "fetched", "kept", "new", "error"), x)) for x in c.execute(
         "select r.* from runs r join (select source, max(at) at from runs group by source) m on r.source = m.source and r.at = m.at")] if "runs" in have else []
-    return {"items": out, "runs": runs, "sites": SITE_KO, "checked": checked,
+    return {"items": out, "runs": runs, "sites": SITE_KO, "checked": checked, "sizes": SIZE_KO,
             "roles": ({r["id"]: r["label"] for r in cfg["roles"]} or {"all": "전체"}) | ({OPEN: "공채 · 직무 확인 중"} if any(OPEN in x["cats"] for x in out) else {})}

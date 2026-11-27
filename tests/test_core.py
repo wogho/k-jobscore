@@ -432,3 +432,21 @@ class ProxyFallback(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 net.get("https://x", site="saramin")
         self.assertEqual(run.call_count, 1)   # 사이트가 막은 것(22)은 다른 경로로 반복하지 않는다
+
+
+class CompanySize(unittest.TestCase):
+    def test_size_by_company_name_not_agency_title(self):
+        self.assertEqual(filters.company_size("[하나은행] 주간 인바운드 상담사 채용", "(주)블루에이치알"), ["other"])
+        self.assertEqual(filters.company_size("수협은행 채널전략팀 계약직 채용", "수협은행"), ["bank"])
+        self.assertEqual(filters.company_size("SC제일은행 2026 하반기 공개채용", "(주)한국스탠다드차타드"), ["bank"])
+        self.assertEqual(filters.company_size("2026년도 정규직 채용공고", "한국자산관리공사"), ["public"])
+        self.assertIn("big", filters.company_size("2026 하반기 신입사원 공개채용", "삼성SDS"))
+
+    def test_open_call_weak_title_and_agency(self):
+        from k_jobscore import opencall
+        cfg = config.load(preset="infra-junior")
+        self.assertTrue(opencall.is_open("2026년도 한국자산관리공사 정규직 및 전문계약직 채용공고", "한국자산관리공사", cfg))
+        self.assertTrue(opencall.is_open("하나은행 2027 상반기 공개채용", "하나은행", cfg))
+        self.assertFalse(opencall.is_open("[하나은행] 주간 인바운드 상담사 채용", "(주)블루에이치알", cfg))
+        self.assertFalse(opencall.is_open("우리은행 대출상담사 모집", "에이플러스모기지(주)", cfg))
+        self.assertTrue(opencall.is_open("2026년 신규직원 채용 공고", "한국산업인력공단", cfg))   # '인력'이 들어간 공공기관

@@ -40,7 +40,7 @@ const PAGE = 50;
 
 const S = {
   data: null, err: "", page: 1, per: store.get("per", 4), panel: false,
-  f: { q: "", sites: null, roles: null, career: "all", edu: null, due: "all", regs: [], sort: "score", min: 0, hideDrop: true, holdOnly: false },
+  f: { q: "", sites: null, roles: null, sizes: null, career: "all", edu: null, due: "all", regs: [], sort: "score", min: 0, hideDrop: true, holdOnly: false },
 };
 
 /* ── 목록 ── */
@@ -48,6 +48,7 @@ function filtered() {
   const f = S.f, s = f.q.trim().toLowerCase();
   const out = S.data.items.filter((j) => {
     if (![j.source, ...(j.also || []).map((a) => a.source)].some((x) => f.sites.includes(x)) || !f.edu.includes(j.edu) || !j.cats.some((c) => f.roles.includes(c))) return false;
+    if (f.sizes && !(j.size || ["other"]).some((x) => f.sizes.includes(x))) return false;
     if (f.career === "new" && !/신입|무관/.test(j.career)) return false;
     if (f.career === "intern" && !/인턴/.test(j.title + j.emp_type)) return false;
     if (f.career === "exp" && !((j.career_min ?? 0) >= 1)) return false;
@@ -182,6 +183,7 @@ function renderFilters() {
       ${check("checkbox", "holdOnly", "1", f.holdOnly, "보류만 보기", `표기 없음 등 보류 ${holds}건`)}
       <button class="kj-btn kj-btn--secondary kj-set-btn" type="button" data-act="settings">점수·조건 설정</button></fieldset>
     <fieldset><legend>직무</legend>${Object.entries(d.roles).map(([k, l]) => check("checkbox", "roles", k, f.roles.includes(k), l, "", items.filter((j) => j.cats.includes(k)).length)).join("")}</fieldset>
+    <fieldset><legend>기업 규모</legend>${Object.entries(d.sizes || {}).map(([k, l]) => check("checkbox", "sizes", k, f.sizes.includes(k), l, "", items.filter((j) => (j.size || ["other"]).includes(k)).length)).join("")}</fieldset>
     <fieldset><legend>경력</legend>${CAREER.map(([k, l]) => check("radio", "career", k, f.career === k, l)).join("")}</fieldset>
     <fieldset><legend>마감</legend>${DUE.map(([k, l]) => check("radio", "due", k, f.due === k, l)).join("")}</fieldset>
     <fieldset><legend>지역</legend>${regions.map(([r, n]) => check("checkbox", "regs", r, f.regs.includes(r), r, "", n)).join("")}<p class="kj-hint">아무것도 고르지 않으면 전체 지역입니다.</p></fieldset>
@@ -199,7 +201,7 @@ function bindFilters() {
     if (t.name === "hideDrop" || t.name === "holdOnly") f[t.name] = t.checked;
     else if (t.name === "career" || t.name === "due") f[t.name] = t.value;
     else if (t.name === "regs") f.regs = t.checked ? [...f.regs, t.value] : f.regs.filter((x) => x !== t.value);
-    else if (t.name === "roles" || t.name === "edu") toggle(f[t.name], t.value);
+    else if (t.name === "roles" || t.name === "edu" || t.name === "sizes") toggle(f[t.name], t.value);
     else return;
     S.page = 1; renderFilters(); renderList();
   });
@@ -213,7 +215,7 @@ function bindFilters() {
 
 function resetFilters() {
   const d = S.data;
-  Object.assign(S.f, { sites: Object.keys(d.sites), roles: Object.keys(d.roles), edu: [...new Set(d.items.map((j) => j.edu))], career: "all", due: "all", regs: [], min: 0, hideDrop: true, holdOnly: false });
+  Object.assign(S.f, { sites: Object.keys(d.sites), roles: Object.keys(d.roles), sizes: Object.keys(d.sizes || {}), edu: [...new Set(d.items.map((j) => j.edu))], career: "all", due: "all", regs: [], min: 0, hideDrop: true, holdOnly: false });
 }
 
 function renderList() {

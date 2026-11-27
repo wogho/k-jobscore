@@ -24,7 +24,11 @@ SECTION_HEAD = re.compile(r"모집\s*(?:부문|분야|직무|직군|요강|개�
 SECTION_END = re.compile(r"전형\s*(?:절차|일정|방법|안내)|접수\s*(?:기간|방법|안내)|지원\s*(?:방법|서류|기간)|제출\s*서류|복리\s*후생|복지|혜택|"
                          r"유의\s*사항|기타\s*사항|문의\s*처?|근무\s*조건|급여|처우", re.I)
 # 제목에 IT가 아닌 직무가 분명히 적힌 공채는 받지 않는다(11-28 최종검증: '공무직(시설경비원)', '(미화)', '대체인력(일반사무)')
-NON_IT_TITLE = r"경비|미화|청소|환경\s*미화|조리|급식|운전|기사\s*\(|시설\s*관리|소방|안전\s*관리|일반\s*사무|사무\s*보조|행정\s*보조|간호|요양|보육|돌봄|" \
+# 회사 이름으로 은행·공공·대기업이 확인되면 '…채용공고'·'…직원 모집'만 있어도 공채로 본다(11-28: '2026년도 한국자산관리공사 정규직 및 전문계약직 채용공고')
+WEAK_OPEN_TITLE = re.compile(r"채용|모집|recruit", re.I)
+# 제목에 '하나은행'만 넣은 인력·대행 회사 공고(대출상담사·콜센터 등)는 공채가 아니다
+AGENCY = re.compile(r"인력|휴먼|파워|서치|아웃소싱|에이치알|HR|모기지|파트너스|에이전시|리크루|잡|커리어|매니지먼트|서비스\s*\(?주|텔레콤\s*서비스|씨에스|CS", re.I)
+NON_IT_TITLE = r"마케팅|마케터|\bMD\b|머천다이저|디자이너|회계|세무|노무|법무|홍보|상담|텔러|대출|콜센터|\bTM\b|아웃바운드|인바운드|영업|보험\s*설계|금융\s*플래너|설계사|간호사|경비|미화|청소|환경\s*미화|조리|급식|운전|기사\s*\(|시설\s*관리|소방|안전\s*관리|일반\s*사무|사무\s*보조|행정\s*보조|간호|요양|보육|돌봄|" \
                r"상담원|안내원|주차|검침|배송|생산직|현장직|물류|영양사|사서|강사|연구원\s*\(?(?:생명|화학|바이오)"
 MIN_READABLE = 200   # 공백 뺀 글자 수 — 이보다 짧으면 링크뿐인 본문으로 본다
 
@@ -39,7 +43,12 @@ def is_open(title, company, cfg):
     제목 감점·즉시 제외 단어가 있으면(상세를 읽지 않으므로 직무 확인이 끝나지 않는다) 받지 않는다."""
     on, kinds = opts(cfg)
     t = title or ""
-    if not (on and OPEN_TITLE.search(t) and company_kinds(t, company) & kinds):
+    if not on:
+        return False
+    own = company_kinds("", company) & kinds                                        # 회사 이름 자체가 은행·공공·대기업
+    weak = own and WEAK_OPEN_TITLE.search(t)                                         # + '채용·모집'
+    strong = OPEN_TITLE.search(t) and company_kinds(t, company) & kinds and (own or not AGENCY.search(company or ""))   # 제목으로만 잡히면 인력·대행 회사 제외
+    if not (strong or weak):
         return False
     if re.search((cfg.get("open_call") or {}).get("exclude_title") or NON_IT_TITLE, t, re.I):
         return False

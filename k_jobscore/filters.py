@@ -8,7 +8,7 @@ import re
 from .normalize import region
 from .verify import RANK, major_required
 
-RE_BANK = re.compile(r"은행|뱅크|금융지주|농협|수협|신협|새마을금고|저축은행|\bbank\b", re.I)
+RE_BANK = re.compile(r"은행|카카오\s*뱅크|케이\s*뱅크|토스\s*뱅크|iM\s*뱅크|금융지주|농협|수협|신협|새마을금고|저축은행|\bbank\b", re.I)
 RE_PUBLIC = re.compile(r"공사(?!\s*현장)|공단|진흥원|공공기관|관리원|정보원|평가원|재단|연구원|시청|구청|군청|도청|교육청|국립|국가|정부|위원회|공기업|준정부|"
                        r"중앙회|한국\S*(원|공사|공단|센터)|\(재\)|의회|법원|검찰|경찰청")
 RE_NOT_PUBLIC = re.compile(r"학원|아카데미|인재개발원|교육원|직업전문학교|캠퍼스|\(사\)|협회")
@@ -32,6 +32,21 @@ def company_kinds(title, company):
     if RE_BIG.search(c):
         kinds.add("big")
     return kinds
+
+
+SIZE_KO = {"big": "대기업", "bank": "은행·금융", "public": "공공기관", "other": "그 외"}
+
+
+def company_size(title, company):
+    """필터 '기업 규모' → ['big' | 'bank' | 'public'] 중 해당하는 것(여럿일 수 있음), 없으면 ['other'].
+    회사 이름으로 판단한다 — 제목의 '하나은행 대출상담사'처럼 인력회사 공고가 은행으로 잡히지 않게. 회사 이름이 법인명이라
+    안 잡히면(예: (주)한국스탠다드차타드) 공채 제목('SC제일은행 하반기 공개채용')일 때만 제목으로 본다."""
+    kinds = company_kinds("", company) - {"any"}
+    if not kinds:
+        from .opencall import AGENCY, OPEN_TITLE
+        if OPEN_TITLE.search(title or "") and not AGENCY.search(company or ""):   # 회사 이름으로 안 잡힐 때만 인력·대행 회사 확인
+            kinds = company_kinds(title, company) - {"any"}
+    return [k for k in ("big", "bank", "public") if k in kinds] or ["other"]
 
 
 _RX = {}
