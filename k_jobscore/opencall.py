@@ -54,6 +54,7 @@ GENERIC = re.compile(r"채용\s*연계형|채용\s*전제형|채용형|체험형
                      r"일반직|일반|행정직|공무직|부문별|분야별|각\s*부문|부문|분야|및|등|년도|년|분기|회차|회|차|제|대졸|고졸|초대졸|학사|석사|박사|"
                      r"상시|급구|본사|지사|지역\s*본부|본부|센터|지점|전국|수도권|서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|"
                      r"경북|경남|제주|명|각|외|의|를|을|및|with|recruit(?:ment)?|hiring|intern(?:ship)?|new|grad(?:uate)?", re.I)
+JOB_ABBR = re.compile(r"^(?:R&D|MD|HR|PM|PR|CS|TM|GFC|SCM|CRM|BD|UX|UI|QC|EHS|ESG|IR|PD)$", re.I)   # 영문 직무 약어 — 회사 약칭으로 지우지 않음(남으면 '다른 직무')
 IT_ABBR = re.compile(r"^(?:IT|ICT|AI|AX|DX|SW|IDC|SRE|QA|DB|ERP|MES|OT|SOC|CERT)$", re.I)
 
 
@@ -65,9 +66,10 @@ def title_triage(title, company, cfg):
     ck = company_key(company)
     s = t
     # 회사 이름(괄호 안 포함)과 영문 약칭(KT&G·HTT 같은 대문자 6자 이하, IT 약어는 남김)을 걷어낸다
-    s = re.sub(r"[\[(【<]([^\])】>]*)[\])】>]", lambda m: " " if ck and ck in company_key(m.group(1)) else f" {m.group(1)} ", s)
+    s = re.sub(r"[\[(【<]([^\])】>]*)[\])】>]", r" \1 ", s)   # 괄호는 풀기만 — 안의 '직영 총괄' 같은 말은 남긴다(회사 이름만 아래에서 지움)
     s = " ".join(w for w in re.split(r"[\s/·,|~\-_+:]+", s)
-                 if not (re.fullmatch(r"[A-Z0-9&.]{1,6}", w) and not IT_ABBR.match(w)) and not (ck and len(ck) >= 2 and ck in company_key(w)))
+                 if not (re.fullmatch(r"[A-Z0-9&.]{1,6}", w) and not IT_ABBR.match(w) and not JOB_ABBR.match(w))
+                 and not (ck and len(ck) >= 2 and ck in company_key(w)))
     s = re.sub(r"\d+", " ", s)
     s = GENERIC.sub(" ", s)
     rest = re.sub(r"[^0-9a-z가-힣\u3040-\u30ff\u4e00-\u9fff]", "", s.lower())   # 한자·가나도 남는 말(중국어 제목 등)
