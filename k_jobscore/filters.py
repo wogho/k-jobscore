@@ -21,10 +21,16 @@ RE_BIG = re.compile(r"삼성|현대(자동차|모비스|건설|제철|백화점|
                     r"^DL|DL[가-힣]|HDC|교보|한국투자|삼천리|현대백화점|HMM|에코프로|한국앤컴퍼니|BGF|이랜드|태영(?:건설|그룹)|KG[가-힣]|다우키움|키움", re.I)
 
 
+LEARNED = {}   # 회사 키 → {big, mid, public, lab, bank, foreign} — 사이트 기업형태 필터에서 본 것(store.load_types)
+
+
 def company_kinds(title, company):
     both = f"{title or ''} {company or ''}"
     c = company or ""
     kinds = {"any"}
+    if LEARNED and c:
+        from .dedup import company_key
+        kinds |= LEARNED.get(company_key(c), set())
     if RE_PUBLIC.search(both) and not RE_PRIVATE.search(c) and not RE_NOT_PUBLIC.search(c):
         kinds.add("public")
     if RE_BANK.search(both):
@@ -34,7 +40,7 @@ def company_kinds(title, company):
     return kinds
 
 
-SIZE_KO = {"big": "대기업", "bank": "은행·금융", "public": "공공기관", "other": "그 외"}
+SIZE_KO = {"big": "대기업", "mid": "중견기업", "public": "공공기관", "lab": "연구기관", "bank": "은행·금융", "foreign": "외국계", "other": "그 외"}
 
 
 def company_size(title, company):
@@ -46,7 +52,7 @@ def company_size(title, company):
         from .opencall import AGENCY, OPEN_TITLE
         if OPEN_TITLE.search(title or "") and not AGENCY.search(company or ""):   # 회사 이름으로 안 잡힐 때만 인력·대행 회사 확인
             kinds = company_kinds(title, company) - {"any"}
-    return [k for k in ("big", "bank", "public") if k in kinds] or ["other"]
+    return [k for k in SIZE_KO if k != "other" and k in kinds] or ["other"]
 
 
 _RX = {}

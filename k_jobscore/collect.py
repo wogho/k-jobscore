@@ -6,6 +6,7 @@ from pathlib import Path
 
 from . import ocr, opencall, score, store, verify
 from .config import SITE_KO
+from . import filters
 from .filters import categorize, passes
 from .http import Net
 from .sources import SOURCES, Ctx
@@ -14,6 +15,7 @@ from .sources import SOURCES, Ctx
 def reclassify(c, cfg):
     """직무 설정이 바뀌면 저장된 공고를 다시 분류 — 맞는 직무가 없으면 지운다 → (남김, 지움)."""
     keep = drop = 0
+    filters.LEARNED = store.load_types(c)
     for source, sid, title, company in c.execute("select source, sid, title, company from postings").fetchall():
         cats = categorize(title, company, cfg["roles"])
         if not cats and opencall.is_open(title, company, cfg):
@@ -52,6 +54,22 @@ def collect(c, cfg, only=None, log=print):
                         ids.add(p["sid"])
                         rows.append(p)
                 time.sleep(net.delay)
+            # 기업형태 필터 목록(검색어 없이): 대기업·공공·연구소·금융 공채 찾기 + 회사 기업형태 기록(기업 규모 필터)
+            oc = cfg.get("open_call") or {}
+            for code, kind in ((oc.get("lists") or {}).get(name, {}).items() if oc.get("enabled") and getattr(mod, "TYPED", False) else []):
+                try:
+                    got = mod.search(ctx, "", cfg["pages"], ctype=code)
+                except Exception as e:  # noqa: BLE001
+                    errs.append(f"{type(e).__name__}: {e}"[:160])
+                    log(f"  {SITE_KO[name]} 기업형태 {code} 실패: {errs[-1]}")
+                    continue
+                store.learn_types(c, got, kind, name, now)
+                for p in got:
+                    if p["sid"] not in ids:
+                        ids.add(p["sid"])
+                        rows.append(p)
+                time.sleep(net.delay)
+            filters.LEARNED = store.load_types(c)
             c.executemany("insert or ignore into seen values(?,?,?)", [(p["source"], p["sid"], now) for p in rows])
             kept = [p for p in rows if passes(p, cfg)]
             new = store.save_postings(c, kept, now)
@@ -104,6 +122,7 @@ def enrich(c, cfg, lock_path, budget=None, limit=400, log=print):
     dcfg = cfg["detail"]
     if not dcfg["enabled"]:
         return 0
+    filters.LEARNED = store.load_types(c)
     lock = _Lock(lock_path)
     if not lock.acquire():
         log("상세 확인: 다른 회차가 진행 중이라 이번엔 건너뜀")

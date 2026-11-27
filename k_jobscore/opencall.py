@@ -11,7 +11,8 @@
 """
 import re
 
-from .filters import _rx, company_kinds
+from .dedup import company_key
+from .filters import _rx, categorize, company_kinds
 
 OPEN = "_open"      # 공채형, 직무 확인 중(보류)
 BODY = "_body"      # 직무를 본문 모집 부문에서 확인
@@ -43,23 +44,54 @@ BODY_RX = {
 
 def opts(cfg):
     o = cfg.get("open_call") or {}
-    return o.get("enabled", True), set(o.get("companies") or ["bank", "public", "big"])
+    return o.get("enabled", True), set(o.get("companies") or ["bank", "public", "big", "lab"])
+
+
+# 제목에서 걷어낼 일반 말 — 이것과 회사 이름·연도·회차·지역을 빼고 남는 말이 없으면 '직무명 없음'(11-28 사용자:
+# "제목에 직무명이 없는 공개채용·채용형 인턴 모집은 불러오고, 다른 직무명이 명확히 적힌 것은 제외하고 내용까지 확인")
+GENERIC = re.compile(r"채용\s*연계형|채용\s*전제형|채용형|체험형|전문\s*계약직|무기\s*계약직|계약직|계약\s*사원|계약|정규직|기간제|대체\s*인력|육아\s*휴직\s*대체|"
+                     r"공개\s*채용|공채|채용|공고|모집|선발|안내|신입|경력|인턴십|인턴|청년|직원|사원|행원|임직원|신규|정기|수시|상반기|하반기|"
+                     r"일반직|일반|행정직|공무직|부문별|분야별|각\s*부문|부문|분야|및|등|년도|년|분기|회차|회|차|제|대졸|고졸|초대졸|학사|석사|박사|"
+                     r"상시|급구|본사|지사|지역\s*본부|본부|센터|지점|전국|수도권|서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|"
+                     r"경북|경남|제주|명|각|외|의|를|을|및|with|recruit(?:ment)?|hiring|intern(?:ship)?|new|grad(?:uate)?", re.I)
+IT_ABBR = re.compile(r"^(?:IT|ICT|AI|AX|DX|SW|IDC|SRE|QA|DB|ERP|MES|OT|SOC|CERT)$", re.I)
+
+
+def title_triage(title, company, cfg):
+    """제목 → 'role'(설정한 직무가 제목에 있음) / 'none'(직무명 없음 — 본문 모집 부문 확인) / 'other'(다른 직무가 분명함)."""
+    t = title or ""
+    if categorize(t, company, cfg["roles"]):
+        return "role"
+    ck = company_key(company)
+    s = t
+    # 회사 이름(괄호 안 포함)과 영문 약칭(KT&G·HTT 같은 대문자 6자 이하, IT 약어는 남김)을 걷어낸다
+    s = re.sub(r"[\[(【<]([^\])】>]*)[\])】>]", lambda m: " " if ck and ck in company_key(m.group(1)) else f" {m.group(1)} ", s)
+    s = " ".join(w for w in re.split(r"[\s/·,|~\-_+:]+", s)
+                 if not (re.fullmatch(r"[A-Z0-9&.]{1,6}", w) and not IT_ABBR.match(w)) and not (ck and len(ck) >= 2 and ck in company_key(w)))
+    s = re.sub(r"\d+", " ", s)
+    s = GENERIC.sub(" ", s)
+    rest = re.sub(r"[^0-9a-z가-힣\u3040-\u30ff\u4e00-\u9fff]", "", s.lower())   # 한자·가나도 남는 말(중국어 제목 등)
+    if ck and len(ck) >= 2:
+        rest = rest.replace(ck, "")
+    return "none" if len(rest) <= 1 else "other"
 
 
 def is_open(title, company, cfg):
-    """공채형으로 받아 상세에서 직무를 확인할 공고인지. 제목에 IT가 아닌 직무가 적혔거나(open_call.exclude_title),
-    제목 감점·즉시 제외 단어가 있으면(상세를 읽지 않으므로 직무 확인이 끝나지 않는다) 받지 않는다."""
+    """공채로 받아 상세 모집 부문에서 직무를 확인할 공고인지.
+    - 회사가 대기업·공공기관·연구기관·은행(사이트 기업형태 필터에서 본 회사 또는 이름으로 확인)이고
+    - 제목에 직무명이 없음(title_triage = none — 다른 직무가 분명하면 제외)
+    - 제목 감점·즉시 제외 단어가 없음(상세를 읽지 않으므로 직무 확인이 끝나지 않는다)"""
     on, kinds = opts(cfg)
     t = title or ""
     if not on:
         return False
-    own = company_kinds("", company) & kinds                                        # 회사 이름 자체가 은행·공공·대기업
-    # '…채용공고'만으로 공채로 보는 것은 공공·은행만 — 대기업은 개별 공고(차량관리·재고관리 등)가 많아 공채 표현이 있어야 한다(11-28 실수집)
-    weak = (own & {"public", "bank"}) and WEAK_OPEN_TITLE.search(t)
-    strong = OPEN_TITLE.search(t) and company_kinds(t, company) & kinds and (own or not AGENCY.search(company or ""))   # 제목으로만 잡히면 인력·대행 회사 제외
-    if not (strong or weak):
+    own = company_kinds("", company) & kinds
+    via_title = OPEN_TITLE.search(t) and company_kinds(t, company) & kinds and not AGENCY.search(company or "")   # 법인명이라 회사로 안 잡힐 때
+    if not (own or via_title):
         return False
     if re.search((cfg.get("open_call") or {}).get("exclude_title") or NON_IT_TITLE, t, re.I):
+        return False
+    if title_triage(t, company, cfg) != "none":
         return False
     from .score import score
     return score(t, "", cfg, False)["stage"] not in ("title_minus", "veto")

@@ -17,10 +17,14 @@ def queries(cfg):
     return list(cfg["queries"]) + ([q for q in oc.get("queries", []) if q not in cfg["queries"]] if oc.get("enabled") else [])
 
 
-def search(ctx, query, pages):
+TYPED = True   # 기업형태 필터 목록(cotype) 지원
+
+
+def search(ctx, query, pages, ctype=None):
     out = []
     for i in range(1, pages + 1):
-        h = ctx.net.get(f"https://www.jobkorea.co.kr/Search/?stext={urllib.parse.quote(query)}&careerType=1&Page_No={i}", site=SITE)
+        extra = f"&cotype={urllib.parse.quote(str(ctype))}&tabType=recruit" if ctype else ""
+        h = ctx.net.get(f"https://www.jobkorea.co.kr/Search/?stext={urllib.parse.quote(query)}&careerType=1&Page_No={i}{extra}", site=SITE)
         cards = {}
         for seg in re.split(r'(?=href="[^"]*/Recruit/GI_Read/\d+)', h)[1:]:
             gid = re.search(r'/Recruit/GI_Read/(\d+)', seg).group(1)

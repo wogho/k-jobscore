@@ -50,7 +50,10 @@ def _base(preset="infra-junior"):
         },
         # 은행·공공·대기업 공채(제목에 직무 없음)는 본문 모집 부문으로 직무 확인 — opencall.py
         "dedup": {"enabled": True},   # 같은 공고 묶기: 화면 한 줄 + 다른 사이트에서 읽은 상세 재사용(dedup.py)
-        "open_call": {"enabled": True, "companies": ["bank", "public", "big"], "queries": ["신입행원", "공개채용", "신입사원 채용", "채용형 인턴", "상반기 채용", "하반기 채용"],
+        "open_call": {"enabled": True, "companies": ["bank", "public", "big", "lab"],
+                      # 사이트 기업형태 필터로 검색어 없이 읽을 목록(사이트 코드 → 종류). 대기업·공공·연구·금융은 공채 찾기, 중견·외국계는 기업 규모 표시용
+                      "lists": {"saramin": {"scale001": "big", "public": "public", "laboratory": "lab", "banking-organ": "bank", "scale003": "mid", "foreign": "foreign"},
+                                "jobkorea": {"1": "big", "2": "big", "8": "public", "4": "mid", "6": "foreign"}}, "queries": ["신입행원", "공개채용", "신입사원 채용", "채용형 인턴", "상반기 채용", "하반기 채용"],
                       "exclude_title": ""},   # 비우면 기본 목록(opencall.NON_IT_TITLE: 경비·미화·일반사무·시설관리 등)
         "detail": {"enabled": True, "ocr": "tesseract", "ocr_langs": "kor+eng", "images_max": 4, "img_min_w": 300, "img_min_h": 200,
                    "ocr_timeout": 240, "budget_sec": 1500, "retry_failed_after_h": 6},
@@ -196,8 +199,10 @@ def clean(cfg):
             raise ValueError(f"network.proxy.{site}는 주소 하나 또는 주소 목록(앞에서부터 시도)")
     oc = cfg["open_call"]
     oc["enabled"] = bool(oc.get("enabled"))
-    if not set(oc.get("companies") or []) <= {"any", "bank", "public", "big"}:
-        raise ValueError("open_call.companies는 any · bank · public · big 중에서")
+    if not set(oc.get("companies") or []) <= {"any", "bank", "public", "big", "lab", "mid", "foreign"}:
+        raise ValueError("open_call.companies는 any · bank · public · big · lab · mid · foreign 중에서")
+    if not isinstance(oc.get("lists", {}), dict):
+        raise ValueError("open_call.lists는 {사이트: {사이트 기업형태 코드: 종류}}")
     if not isinstance(oc.get("exclude_title", ""), str):
         raise ValueError("open_call.exclude_title는 정규식 문자열")
     if not isinstance(oc.get("queries"), list) or len(oc["queries"]) > 20 or not all(isinstance(x, str) for x in oc["queries"]):

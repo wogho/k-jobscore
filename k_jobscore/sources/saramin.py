@@ -15,11 +15,17 @@ def queries(cfg):
     return list(cfg["queries"]) + ([q for q in oc.get("queries", []) if q not in cfg["queries"]] if oc.get("enabled") else [])
 
 
-def search(ctx, query, pages):
+TYPED = True   # 기업형태 필터 목록(company_type[]) 지원 — 검색어 없이 대기업·공공·연구소·금융 공고 전부(opencall)
+
+
+def search(ctx, query, pages, ctype=None):
     out = []
     for i in range(1, pages + 1):
-        q = urllib.parse.urlencode({"searchType": "search", "searchword": query, "exp_cd": 1, "exp_none": "y", "recruitPage": i,
-                                    "recruitPageCount": 100, "recruitSort": "reg_dt"})
+        params = {"searchType": "search", "searchword": query, "exp_cd": 1, "exp_none": "y", "recruitPage": i,
+                  "recruitPageCount": 100, "recruitSort": "reg_dt"}
+        if ctype:
+            params["company_type[]"] = ctype
+        q = urllib.parse.urlencode(params)
         h = ctx.net.get(f"https://www.saramin.co.kr/zf_user/search/recruit?{q}", site=SITE)
         blocks = h.split('<div class="item_recruit"')[1:]
         for b in blocks:

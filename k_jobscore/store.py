@@ -10,6 +10,8 @@ SCHEMA = [
     "create table if not exists seen(source text, sid text, at text, primary key(source, sid))",
     """create table if not exists details(source text, sid text, fetched_at text, body text, ocr text, images integer,
        career_v text, edu_v text, note text, error text, primary key(source, sid))""",
+    # 회사 기업형태 — 사람인·잡코리아 기업형태 필터 목록에서 본 회사(사이트 분류 그대로, 11-28)
+    "create table if not exists company_types(ckey text, kind text, site text, at text, primary key(ckey, kind))",
     # 이미지 글자 읽기 결과 — 이미지 내용(sha1)·언어가 같으면 다시 읽지 않는다(dedup)
     "create table if not exists ocr_cache(hash text, langs text, text text, at text, primary key(hash, langs))",
     """create table if not exists ai(source text, sid text, key text, at text, model text, fit integer, result text, error text,
@@ -41,6 +43,25 @@ class OcrCache:
 
     def put(self, h, langs, text):
         self.c.execute("insert or replace into ocr_cache values(?,?,?,datetime('now','localtime'))", (h, langs, text))
+
+
+def learn_types(c, rows, kind, site, now):
+    from .dedup import company_key
+    for p in rows:
+        ck = company_key(p.get("company"))
+        if ck:
+            c.execute("insert or replace into company_types values(?,?,?,?)", (ck, kind, site, now))
+
+
+def load_types(c):
+    """→ {회사 키: {종류…}} — filters.LEARNED에 넣어 기업 규모·공채 판단에 쓴다."""
+    out = {}
+    try:
+        for ck, kind in c.execute("select ckey, kind from company_types"):
+            out.setdefault(ck, set()).add(kind)
+    except Exception:  # noqa: BLE001 — 읽기 전용 예전 DB
+        pass
+    return out
 
 
 def save_postings(c, rows, now):

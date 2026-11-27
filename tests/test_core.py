@@ -460,3 +460,55 @@ class OpenCallBody(unittest.TestCase):
         self.assertEqual(opencall.resolve("2027년 상반기 인턴 공개채용", "영화진흥위원회", t, cfg), [opencall.EXCLUDED])
         t2 = "모집부문\n디지털/ICT\n정보시스템 구축 및 지원 업무\n전형절차\n" + "안내 " * 80
         self.assertIn("digital", opencall.resolve("2027년 상반기 공개채용", "영화진흥위원회", t2, cfg))
+
+
+class TitleTriage(unittest.TestCase):
+    """대기업·공공·연구기관·금융: 제목에 직무명 없는 공채만 받고, 다른 직무가 분명한 공고는 제외(11-28)."""
+    def setUp(self):
+        self.cfg = config.load(preset="infra-junior")
+
+    def test_triage(self):
+        from k_jobscore import opencall
+        tri = lambda t, c: opencall.title_triage(t, c, self.cfg)
+        for t, c in [("2026년도 한국자산관리공사 정규직 및 전문계약직 채용공고", "한국자산관리공사"), ("2027년 제1회 파주도시공사 직원(일반직,경력직)채용", "파주도시공사"),
+                     ("㈜셀트리온제약 신입/경력 수시채용", "(주)셀트리온제약"), ("2026년 하반기 KT&G 계약사원 채용", "(주)케이티앤지"), ("하나은행 2027 상반기 신입행원 공개채용", "하나은행")]:
+            self.assertEqual(tri(t, c), "none", t)
+        for t, c in [("2026년 하반기 주방보조 경력무관 채용", "(주)현대그린푸드"), ("롯데렌터카 차량관리(점검) 계약직 채용", "롯데렌탈(주)"),
+                     ("2026년 하반기 AI 체험형 인턴 채용(건축)", "한국수자원공사"), ("釜山数据中心运维工程师要求中文流利", "주식회사 클라우드엔진디지털")]:
+            self.assertEqual(tri(t, c), "other", t)
+        from k_jobscore.dedup import company_key
+        old = dict(filters.LEARNED)
+        try:
+            filters.LEARNED[company_key("대한장애인체육회")] = {"public"}   # 사이트 공공기관 목록에서 본 회사 → '전산' 직무 대상
+            self.assertEqual(tri("[기간제 계약직-전산행정(청년인턴)] 2026년 제4차 채용", "대한장애인체육회"), "role")
+        finally:
+            filters.LEARNED.clear(); filters.LEARNED.update(old)
+
+    def test_is_open_uses_site_company_types(self):
+        from k_jobscore import opencall
+        from k_jobscore.dedup import company_key
+        self.assertFalse(opencall.is_open("각 부문별 채용", "(주)안국엔지니어링", self.cfg))
+        old = dict(filters.LEARNED)
+        try:
+            filters.LEARNED[company_key("(주)안국엔지니어링")] = {"lab"}   # 사람인 '연구소' 목록에서 본 회사
+            self.assertTrue(opencall.is_open("각 부문별 채용", "(주)안국엔지니어링", self.cfg))
+            self.assertEqual(filters.company_size("각 부문별 채용", "(주)안국엔지니어링"), ["lab"])
+        finally:
+            filters.LEARNED.clear(); filters.LEARNED.update(old)
+
+    def test_collect_reads_typed_lists_and_learns(self):
+        from unittest import mock
+        from k_jobscore import collect
+        c = store.connect(":memory:")
+        cfg = dict(self.cfg, sources={"saramin": True, "wanted": False, "jobkorea": False, "remember": False}, queries=["x"],
+                   open_call=dict(self.cfg["open_call"], queries=[], lists={"saramin": {"public": "public"}}))
+        row = {"source": "saramin", "sid": "7", "url": "u", "title": "2026년도 정규직 채용공고", "company": "한국자산관리공사", "location": "서울",
+               "career": "신입", "career_min": 0, "edu": "무관", "emp_type": "", "deadline": "2099-12-31"}
+        calls = []
+        def fake(ctx, q, pages, ctype=None):
+            calls.append((q, ctype)); return [dict(row)] if ctype == "public" else []
+        with mock.patch.object(collect.SOURCES["saramin"], "search", side_effect=fake), mock.patch.object(collect.time, "sleep"):
+            collect.collect(c, cfg, log=lambda *a: None)
+        self.assertIn(("", "public"), calls)
+        self.assertEqual(c.execute("select cats from postings where sid='7'").fetchone()[0], "_open")
+        self.assertEqual(store.load_types(c), {"한국자산관리공사": {"public"}})

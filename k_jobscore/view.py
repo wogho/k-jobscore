@@ -31,6 +31,8 @@ def items(c, cfg, now=None):
         f"where coalesce(p.cats,'') != '{EXCLUDED}' and ((p.deadline glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' and p.deadline >= ?) "
         "or (p.deadline not glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' and p.first_seen >= ?)) order by p.first_seen desc", (today, since)).fetchall()
     out, checked = [], 0
+    from . import filters as _f, store as _st
+    _f.LEARNED = _st.load_types(c) if "company_types" in have else {}
     w = cfg["ai"]["weight"] if cfg["ai"]["enabled"] else 0
     for row in rows:
         r = dict(zip(cols, row))
